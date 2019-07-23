@@ -1,0 +1,26 @@
+<year> = 4-digit year
+<yr>   = 2-digit year
+
+All candidates
+https://www.fec.gov/files/bulk-downloads/<year>/weball<yr>.zip
+
+Candidate master
+https://www.fec.gov/files/bulk-downloads/<year>/cn<yr>.zip
+
+Candidate-committee linkages
+https://www.fec.gov/files/bulk-downloads/<year>/ccl<yr>.zip
+
+Committee master
+https://www.fec.gov/files/bulk-downloads/<year>/cm<yr>.zip
+
+PAC summary
+https://www.fec.gov/files/bulk-downloads/<year>/webk<yr>.zip
+
+Contributions by individuals
+https://www.fec.gov/files/bulk-downloads/<year>/indiv<yr>.zip
+
+Contributions from committees
+https://www.fec.gov/files/bulk-downloads/<year>/pas2<yr>.zip
+
+Transactions by committees
+https://www.fec.gov/files/bulk-downloads/<year>/oth<yr>.zip
