@@ -6,7 +6,7 @@
 
 This project contains simple scripts for the following:
 
-* Downloading bulk data files from the FEC (Federal Election Committee) website
+* Downloading bulk data files from the FEC (Federal Election Commission) website
 * Creating RDBMS (PostgreSQL) tables for the FEC data sets
 * Loading the FEC bulk data into the database
 * Indexes and views for supporting various queries against the database
