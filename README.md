@@ -61,20 +61,25 @@ These should be installed in your environment before proceeding with the set up 
 ## Setting Things Up ##
 
 *The following example steps show the process for dowloading and loading the 2020 election data (resulting in a ~600MB database).
-All of the scripts support working with data from multiple elections years (named after the even years)--fuller documentation to
-come.*
+All of the scripts support working with data from multiple elections years (named after the even years)&mdash;fuller documentation
+to come.*
 
 ### Download data sets ###
 
-    $ scripts/wget_fec_data.sh 2020
+    $ cd data
+    $ ../scripts/wget_fec_data.sh 2020
+    $ ls *.zip
+    $ cd ..
+
+*Note that the `wget_fec_data.sh` script is pretty basic, so only downloads into the current working directory*
 
 ### Create database and tables ###
 
-*Note that any of the command line database operations in this step (or following steps) can also be done equivalently
-through a GUI (e.g. pgadmin).*
-
     $ createdb fecdb
     $ psql -f sql/create_tables.sql fecdb
+
+*Note that any of the command line database operations in this step (or following steps) can also be done equivalently
+through a GUI (e.g. pgadmin).*
 
 ### Load data ###
 
