@@ -203,3 +203,32 @@ CREATE TABLE IF NOT EXISTS indiv_contrib (
     memo_text            TEXT,
     sub_id               NUMERIC(19)
 );
+
+--
+-- Transaction Type
+-- [from https://www.fec.gov/campaign-finance-data/transaction-type-code-descriptions/]
+--
+CREATE TABLE IF NOT EXISTS transaction_type (
+    transaction_tp       TEXT UNIQUE,
+    description          TEXT
+);
+
+--
+-- Committee Type
+-- [from https://www.fec.gov/campaign-finance-data/committee-type-code-descriptions/]
+--
+CREATE TABLE IF NOT EXISTS cmte_type (
+    cmte_tp              TEXT UNIQUE,
+    cmte_type_name       TEXT,
+    description          TEXT
+);
+
+--
+-- Party
+-- [from https://www.fec.gov/campaign-finance-data/party-code-descriptions/]
+--
+CREATE TABLE IF NOT EXISTS party (
+    party_cd             TEXT UNIQUE,
+    party_name           TEXT,
+    notes                TEXT
+);
