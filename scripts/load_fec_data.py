@@ -10,7 +10,7 @@ UNZIP_TMPL   = 'unzip -p %s'
 GAWK_TMPL    = 'gawk -F "|" -f %s/fmt_%s.awk'
 SED_CMD      = 'sed "s/\\\\\\\\/\\\\\\\\\\\\\\\\/g"'
 UNIQ_CMD     = 'uniq'
-COPY_TMPL    = "copy %s from program '%s' with (format text, delimiter '|', null '')"
+COPY_TMPL    = "copy %s from program '%s' with (format text, delimiter '|', null '', encoding 'latin1')"
 PSQL_ARGS    = ['psql', '-e']
 
 FILE_DIR     = os.path.dirname(os.path.realpath(__file__))
