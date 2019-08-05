@@ -1,0 +1,11 @@
+ANALYZE VERBOSE cand;
+ANALYZE VERBOSE cand_cmte;
+ANALYZE VERBOSE cand_fins;
+ANALYZE VERBOSE cmte;
+ANALYZE VERBOSE cmte_contrib;
+ANALYZE VERBOSE cmte_fins;
+ANALYZE VERBOSE cmte_misc;
+ANALYZE VERBOSE cmte_type;
+ANALYZE VERBOSE indiv_contrib;
+ANALYZE VERBOSE party;
+ANALYZE VERBOSE transaction_type;
