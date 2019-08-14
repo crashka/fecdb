@@ -10,6 +10,7 @@ python3 scripts/load_fec_data.py all 2020 fec20
 psql -c "\\copy transaction_type from 'data/transaction_type.txt'" fec20
 psql -c "\\copy cmte_type from 'data/cmte_type.txt'" fec20
 psql -c "\\copy party from 'data/party.txt'" fec20
+psql -c "\\copy election_cycle from 'data/election_cycle.txt'" fec20
 psql -ef sql/load_indiv_tables.sql fec20
 
 psql -ef sql/create_indexes0.sql fec20

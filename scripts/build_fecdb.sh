@@ -10,6 +10,7 @@ python3 scripts/load_fec_data.py all 2020,2018,2016,2014,2012,2010,2008,2006,200
 psql -c "\\copy transaction_type from 'data/transaction_type.txt'" fecdb
 psql -c "\\copy cmte_type from 'data/cmte_type.txt'" fecdb
 psql -c "\\copy party from 'data/party.txt'" fecdb
+psql -c "\\copy election_cycle from 'data/election_cycle.txt'" fecdb
 psql -ef sql/load_indiv_tables.sql fecdb
 
 psql -ef sql/create_indexes0.sql fecdb
