@@ -137,7 +137,7 @@ select ic.elect_cycle,
  *  if/how this might affect the overall accounting (not just for this household,
  *  but across all contribution records)
  *
- *  Ignoring that for the moment, let's now isolate presential election cycles
+ *  Ignoring that for the moment, let's now isolate presidential election cycles
  */
 select ic.elect_cycle,
        count(*) cycle_contribs,
@@ -154,7 +154,7 @@ select ic.elect_cycle,
  order by 1;
 
 /*
- *  And interim election cycles
+ *  And mid-term election cycles
  */
 select ic.elect_cycle,
        count(*) cycle_contribs,
@@ -185,7 +185,7 @@ select count(*) total_contribs,
    and ic.elect_cycle % 4 = 0;
 
 /*
- *  And totals for the interim election cycles
+ *  And totals for the mid-term election cycles
  */
 select count(*) total_contribs,
        sum(ic.transaction_amt) total_amount,
