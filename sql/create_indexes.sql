@@ -52,24 +52,21 @@ CREATE INDEX cand_cmte_cmte_id             ON cand_cmte (cmte_id);
 CREATE INDEX indiv_contrib_cmte_id         ON indiv_contrib (cmte_id);
 CREATE INDEX indiv_contrib_transaction_tp  ON indiv_contrib (transaction_tp);
 CREATE INDEX indiv_contrib_transaction_amt ON indiv_contrib (transaction_amt);
---CREATE INDEX indiv_contrib_name_zip_code   ON indiv_contrib (name, zip_code);
---CREATE INDEX indiv_contrib_state_city      ON indiv_contrib (state, city);
---CREATE INDEX indiv_contrib_zip_code        ON indiv_contrib (zip_code);
---CREATE INDEX indiv_contrib_indiv_hashkey   ON indiv_contrib (indiv_hashkey);
---CREATE INDEX indiv_contrib_indiv2_hashkey  ON indiv_contrib (indiv2_hashkey);
-CREATE INDEX indiv_contrib_indiv_id        ON indiv_contrib (indiv_id);
-CREATE INDEX indiv_contrib_indiv2_id       ON indiv_contrib (indiv2_id);
+CREATE INDEX indiv_contrib_indiv_id        ON indiv_contrib (indiv_id, transaction_dt);
+CREATE INDEX indiv_contrib_indiv2_id       ON indiv_contrib (indiv2_id, transaction_dt);
 
 --
--- Individual Contributions (indiv)
+-- Individual Master (indiv)
 --
 CREATE UNIQUE INDEX indiv_user_key         ON indiv (name, zip_code, city, state);
 CREATE INDEX indiv_state_city              ON indiv (state, city);
 CREATE INDEX indiv_zip_code                ON indiv (zip_code);
+CREATE INDEX indiv_last_name_first_name    ON indiv (last_name, first_name);
 
 --
--- Individual Contributions (indiv2)
+-- Individual Master [Alt] (indiv2)
 --
 CREATE UNIQUE INDEX indiv2_user_key        ON indiv2 (name, zip_code, city, state, employer, occupation);
 CREATE INDEX indiv2_state_city             ON indiv2 (state, city);
 CREATE INDEX indiv2_zip_code               ON indiv2 (zip_code);
+CREATE INDEX indiv2_last_name_first_name   ON indiv2 (last_name, first_name);

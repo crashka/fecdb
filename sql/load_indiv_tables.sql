@@ -31,55 +31,56 @@ select name,
   from indiv_contrib
  group by 1, 2, 3, 4, 5, 6, 7;
 
-/*
--- can build `indiv` the same as above...
-insert into indiv (
-       name,
-       city,
-       state,
-       zip_code,
-       hashkey,
-       elect_cycles
-       )
-select name,
-       city,
-       state,
-       zip_code,
-       substr(md5(concat(name, '|',
-                         city, '|',
-                         state, '|',
-                         zip_code)), :substr_off),
-       array_agg(distinct elect_cycle)
-  from indiv_contrib
- group by 1, 2, 3, 4, 5;
-*/
-
--- ...or here is us being clever (assuming it works, and is actually faster)
-insert into indiv (
-       name,
-       city,
-       state,
-       zip_code,
-       hashkey,
-       elect_cycles
-       )
-select name,
-       city,
-       state,
-       zip_code,
-       hashkey,
-       array_agg(distinct elect_cycle)
-  from (select name,
-               city,
-               state,
-               zip_code,
-               substr(md5(concat(name, '|',
-                                 city, '|',
-                                 state, '|',
-                                 zip_code)), :substr_off) as hashkey,
-               unnest(elect_cycles) as elect_cycle
-          from indiv2) as indiv2_unnested
- group by 1, 2, 3, 4, 5;
+\if 0
+    -- we can build `indiv` the same as above...
+    insert into indiv (
+           name,
+           city,
+           state,
+           zip_code,
+           hashkey,
+           elect_cycles
+           )
+    select name,
+           city,
+           state,
+           zip_code,
+           substr(md5(concat(name, '|',
+                             city, '|',
+                             state, '|',
+                             zip_code)), :substr_off),
+           array_agg(distinct elect_cycle)
+      from indiv_contrib
+     group by 1, 2, 3, 4, 5;
+\else
+    -- ...or here is us being clever (I think this works, and should be
+    -- quite a bit faster)
+    insert into indiv (
+           name,
+           city,
+           state,
+           zip_code,
+           hashkey,
+           elect_cycles
+           )
+    select name,
+           city,
+           state,
+           zip_code,
+           hashkey,
+           array_agg(distinct elect_cycle)
+      from (select name,
+                   city,
+                   state,
+                   zip_code,
+                   substr(md5(concat(name, '|',
+                                     city, '|',
+                                     state, '|',
+                                     zip_code)), :substr_off) as hashkey,
+                   unnest(elect_cycles) as elect_cycle
+              from indiv2) as indiv2_unnested
+     group by 1, 2, 3, 4, 5;
+ \endif
 
 --
 -- full-table update will implicity copy the table, but don't need to do a
