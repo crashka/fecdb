@@ -301,9 +301,11 @@ CREATE TABLE IF NOT EXISTS indiv (
     title                TEXT,
     suffix               TEXT,
     elect_cycles         INTEGER[],
-    -- not sure if we want to use this yet--but if so, it will probably
-    -- be a denorm of `indiv_alias` rows
-    alias_ids            BIGINT[]
+    -- individuals deemed to be the same person point to the same "base"
+    -- `indiv` record (FK defined below); the base record points to itself
+    base_indiv_id        BIGINT,
+    -- "hhh" = head of household, this works similarly to `base_indiv_id`
+    hhh_indiv_id         BIGINT
 )
 WITH (FILLFACTOR=70);
 
@@ -333,13 +335,22 @@ CREATE TABLE IF NOT EXISTS indiv2 (
     title                TEXT,
     suffix               TEXT,
     elect_cycles         INTEGER[],
-    -- see comment for similar column on `indiv` (above)
-    alias_ids            BIGINT[]
+    -- see comment for similar columns on `indiv` (above)
+    base_indiv2_id       BIGINT,
+    hhh_indiv2_id        BIGINT
 )
 WITH (FILLFACTOR=70);
 
 --
 -- foreign key constraints for indiv_contrib
 --
-ALTER TABLE indiv_contrib ADD FOREIGN KEY (indiv_id) REFERENCES indiv (id) ON DELETE SET NULL;
+ALTER TABLE indiv_contrib ADD FOREIGN KEY (indiv_id)  REFERENCES indiv (id)  ON DELETE SET NULL;
 ALTER TABLE indiv_contrib ADD FOREIGN KEY (indiv2_id) REFERENCES indiv2 (id) ON DELETE SET NULL;
+
+--
+-- foreign key constraints for indiv and indiv2
+--
+ALTER TABLE indiv  ADD FOREIGN KEY (base_indiv_id)  REFERENCES indiv (id);
+ALTER TABLE indiv  ADD FOREIGN KEY (hhh_indiv_id)   REFERENCES indiv (id);
+ALTER TABLE indiv2 ADD FOREIGN KEY (base_indiv2_id) REFERENCES indiv2 (id);
+ALTER TABLE indiv2 ADD FOREIGN KEY (hhh_indiv2_id)  REFERENCES indiv2 (id);

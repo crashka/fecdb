@@ -1,5 +1,5 @@
 /*
- *  Topic 2
+ *  EL Topic 2
  *
  *    - I want to be able to see people who have donated to 314 and other things
  *      they have donated to predict who might be likely to donate to 314.
@@ -11,11 +11,16 @@
  */
 \ir create_view_contrib_to_314.sql
 
+select table_catalog,
+       table_schema,
+       table_name
+  from information_schema.views
+ where table_name = 'contrib_to_314';
+
 /*
  *  Let's start by building working set for top 50 contributors to 314 (all time)
  *
  */
-
 create materialized view top_314_donors as
 select i.id as indiv_id,
        i.name as donor,
@@ -94,7 +99,7 @@ select cm.cmte_nm as committee,
  group by 1
 having sum(ic.transaction_amt) >= 100000
  order by 3 desc, 1 asc;
- 
+
 /*
  *  Now, the largest aggregate contributions by donors to specific committees in the
  *  previous set (cutoff here is $50,000)
@@ -117,7 +122,7 @@ select cm.cmte_nm as committee,
  group by 1, 2
 having sum(ic.transaction_amt) >= 50000
  order by 4 desc, 2 asc;
- 
+
 /*
  *  Same as previous, but adding in election cycle (cutoff is $25,000)
  */
@@ -139,7 +144,7 @@ select cm.cmte_nm as committee,
  group by 1, 2, 3
 having sum(ic.transaction_amt) >= 25000
  order by 5 desc, 2 asc, 3 asc;
- 
+
 /*
  *  Here's a repeat of the previous few queries, but only looking at contributions in
  *  election cycles coincident with contributions to 314
@@ -193,7 +198,7 @@ select cm.cmte_nm as committee,
  group by 1
 having sum(ic.transaction_amt) >= 100000
  order by 3 desc, 1 asc;
- 
+
 /*
  *  Now, the largest aggregate contributions by donors to specific committees in the
  *  previous set (for election cycles in which the donor made a 314 contribution)
@@ -217,7 +222,7 @@ select cm.cmte_nm as committee,
  group by 1, 2
 having sum(ic.transaction_amt) >= 50000
  order by 4 desc, 2 asc;
- 
+
 /*
  *  Same as previous, but adding in election cycle (again, only those in which the
  *  donor made a 314 contribution)
@@ -241,7 +246,7 @@ select cm.cmte_nm as committee,
  group by 1, 2, 3
 having sum(ic.transaction_amt) >= 25000
  order by 5 desc, 2 asc, 3 asc;
- 
+
 /*
  *  And here are the top 314 contributors who didn't give to other committees at all
  *  (as far as we can tell, with the individual master record correlations)
