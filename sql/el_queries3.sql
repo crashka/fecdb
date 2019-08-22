@@ -344,7 +344,6 @@ with hh_contrib as (
            on cmte.cmte_id = ic.cmte_id
            and cmte.elect_cycle = ic.elect_cycle
      group by 1
-     order by 1
 )
 select hhc.contrib_dt,
        hhc.contrib_amt,
@@ -380,7 +379,6 @@ with hh_contrib as (
            on cmte.cmte_id = ic.cmte_id
            and cmte.elect_cycle = ic.elect_cycle
      group by 1
-     order by 1
 )
 select hhc.contrib_dt,
        hhc.contrib_amt,
@@ -438,7 +436,6 @@ with base_contrib as (
            on cmte.cmte_id = ic.cmte_id
            and cmte.elect_cycle = ic.elect_cycle
      group by 1
-     order by 1
 )
 select bc.contrib_dt,
        bc.contrib_amt,

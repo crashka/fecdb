@@ -2,10 +2,6 @@
 -- loop, which is slower but predictably linear time
 \set use_hash_join true
 
--- just create a clean copy of indiv_contrib (rather than have
--- UPDATE do it implicitly)
-CREATE TABLE indiv_contrib_new (LIKE indiv_contrib INCLUDING CONSTRAINTS);
-
 -- check for possible hash collisions
 select count(distinct i.hashkey) as collisions1
   from indiv i
@@ -30,9 +26,13 @@ select count(distinct i2.hashkey) as collisions2
 select (:collisions1 + :collisions2) = 0 as no_collisions
 \gset
 
+-- in all cases, just create a clean copy of indiv_contrib with the `indiv`
+-- and `indiv2` foreign keys added (rather than have UPDATE do it implicitly);
+-- this also gives us a chance to make the table leaner (i.e. get rid of the
+-- denorms and hashkeys)
 \if :no_collisions
     \if :use_hash_join
-        insert into indiv_contrib_new
+        create table indiv_contrib_new as
         select ic.id,
                ic.cmte_id,
                ic.amndt_ind,
@@ -41,12 +41,6 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
                ic.image_num,
                ic.transaction_tp,
                ic.entity_tp,
-               ic.name,
-               ic.city,
-               ic.state,
-               ic.zip_code,
-               ic.employer,
-               ic.occupation,
                ic.transaction_dt,
                ic.transaction_amt,
                ic.other_id,
@@ -56,8 +50,6 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
                ic.memo_text,
                ic.sub_id,
                ic.elect_cycle,
-               ic.indiv_hashkey,
-               ic.indiv2_hashkey,
                i.id as indiv_id,
                i2.id as indiv2_id
           from indiv_contrib ic
@@ -65,7 +57,7 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
           left join indiv2 i2 on i2.hashkey = ic.indiv2_hashkey;
     \else
         -- nested loop alternative
-        insert into indiv_contrib_new
+        create table indiv_contrib_new as
         select ic.id,
                ic.cmte_id,
                ic.amndt_ind,
@@ -74,12 +66,6 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
                ic.image_num,
                ic.transaction_tp,
                ic.entity_tp,
-               ic.name,
-               ic.city,
-               ic.state,
-               ic.zip_code,
-               ic.employer,
-               ic.occupation,
                ic.transaction_dt,
                ic.transaction_amt,
                ic.other_id,
@@ -89,8 +75,6 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
                ic.memo_text,
                ic.sub_id,
                ic.elect_cycle,
-               ic.indiv_hashkey,
-               ic.indiv2_hashkey,
                (select i.id
                   from indiv i
                  where i.hashkey = ic.indiv_hashkey) as indiv_id,
@@ -103,7 +87,7 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
     -- fallback in case there is a hash collision (need to add individual data
     -- columns to join condition)
     \if :use_hash_join
-        insert into indiv_contrib_new
+        create table indiv_contrib_new as
         select ic.id,
                ic.cmte_id,
                ic.amndt_ind,
@@ -112,12 +96,6 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
                ic.image_num,
                ic.transaction_tp,
                ic.entity_tp,
-               ic.name,
-               ic.city,
-               ic.state,
-               ic.zip_code,
-               ic.employer,
-               ic.occupation,
                ic.transaction_dt,
                ic.transaction_amt,
                ic.other_id,
@@ -127,8 +105,6 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
                ic.memo_text,
                ic.sub_id,
                ic.elect_cycle,
-               ic.indiv_hashkey,
-               ic.indiv2_hashkey,
                i.id as indiv_id,
                i2.id as indiv2_id
           from indiv_contrib ic
@@ -146,7 +122,7 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
                              and coalesce(i2.occupation, '') = coalesce(ic.occupation, '');
     \else
         -- nested loop alternative
-        insert into indiv_contrib_new
+        create table indiv_contrib_new as
         select ic.id,
                ic.cmte_id,
                ic.amndt_ind,
@@ -155,12 +131,6 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
                ic.image_num,
                ic.transaction_tp,
                ic.entity_tp,
-               ic.name,
-               ic.city,
-               ic.state,
-               ic.zip_code,
-               ic.employer,
-               ic.occupation,
                ic.transaction_dt,
                ic.transaction_amt,
                ic.other_id,
@@ -170,8 +140,6 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
                ic.memo_text,
                ic.sub_id,
                ic.elect_cycle,
-               ic.indiv_hashkey,
-               ic.indiv2_hashkey,
                (select i.id
                   from indiv i
                  where i.hashkey = ic.indiv_hashkey
@@ -214,6 +182,33 @@ select (:null_ids1 + :null_ids2) = 0 as success
     ALTER TABLE indiv_contrib ALTER id ADD GENERATED BY DEFAULT AS IDENTITY;
     ALTER TABLE indiv_contrib ADD FOREIGN KEY (indiv_id) REFERENCES indiv (id) ON DELETE SET NULL;
     ALTER TABLE indiv_contrib ADD FOREIGN KEY (indiv2_id) REFERENCES indiv2 (id) ON DELETE SET NULL;
+
+    CREATE VIEW indiv_contrib_fec AS
+    SELECT ic.id,
+           ic.cmte_id,
+           ic.amndt_ind,
+           ic.rpt_tp,
+           ic.transaction_pgi,
+           ic.image_num,
+           ic.transaction_tp,
+           ic.entity_tp,
+           i2.name,
+           i2.city,
+           i2.state,
+           i2.zip_code,
+           i2.employer,
+           i2.occupation,
+           ic.transaction_dt,
+           ic.transaction_amt,
+           ic.other_id,
+           ic.tran_id,
+           ic.file_num,
+           ic.memo_cd,
+           ic.memo_text,
+           ic.sub_id,
+           ic.elect_cycle
+      FROM indiv_contrib ic
+      JOIN indiv2 i2 ON i2.id = ic.indiv2_id;
 \else
     \echo indiv_ids not set (:null_ids1 :null_ids2), exiting...
     \quit

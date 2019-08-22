@@ -52,8 +52,10 @@ CREATE INDEX cand_cmte_cmte_id             ON cand_cmte (cmte_id);
 CREATE INDEX indiv_contrib_cmte_id         ON indiv_contrib (cmte_id);
 CREATE INDEX indiv_contrib_transaction_tp  ON indiv_contrib (transaction_tp);
 CREATE INDEX indiv_contrib_transaction_amt ON indiv_contrib (transaction_amt);
-CREATE INDEX indiv_contrib_indiv_id        ON indiv_contrib (indiv_id, transaction_dt);
-CREATE INDEX indiv_contrib_indiv2_id       ON indiv_contrib (indiv2_id, transaction_dt);
+--CREATE INDEX indiv_contrib_indiv_id        ON indiv_contrib (indiv_id, transaction_dt);
+--CREATE INDEX indiv_contrib_indiv2_id       ON indiv_contrib (indiv2_id, transaction_dt);
+CREATE INDEX indiv_contrib_indiv_id        ON indiv_contrib (indiv_id);
+CREATE INDEX indiv_contrib_indiv2_id       ON indiv_contrib (indiv2_id);
 
 --
 -- Individual Master (indiv)
