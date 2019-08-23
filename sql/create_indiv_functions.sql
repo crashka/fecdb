@@ -18,19 +18,22 @@
 --      )
 --      select set_base_indiv('indiv', array_agg(id)) from indiv_set;
 --
-CREATE OR REPLACE FUNCTION set_base_indiv(indiv_tbl TEXT, ids BIGINT[]) RETURNS TEXT AS $$
+CREATE OR REPLACE FUNCTION set_base_indiv(indiv_tbl TEXT, ids BIGINT[]) RETURNS BIGINT AS $$
 DECLARE
-    fkcol TEXT = 'base_indiv_id';
-    sql   TEXT;
-    res   INTEGER;
+    fkcol  TEXT = 'base_indiv_id';
+    sql    TEXT;
+    min_id BIGINT;
+    rows   INTEGER;
 BEGIN
-    sql = format('update %I'
-                 '   set %I = (select min(id) from unnest($1) id)'
-                 ' where id in (select unnest($1))', indiv_tbl, fkcol);
-    EXECUTE sql USING ids;
+    sql = format('update %I
+                     set %I = (select min(id) from unnest($1) id)
+                   where id in (select unnest($1))
+               returning %I', indiv_tbl, fkcol, fkcol);
+    EXECUTE sql INTO min_id USING ids;
 
-    GET DIAGNOSTICS res = ROW_COUNT;
-    RETURN res;
+    GET DIAGNOSTICS rows = ROW_COUNT;
+    --RAISE INFO 'Records updated: %', rows;
+    RETURN min_id;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -45,18 +48,21 @@ $$ LANGUAGE plpgsql;
 --      )
 --      select set_hhh_indiv('indiv', array_agg(id)) from indiv_set;
 --
-CREATE OR REPLACE FUNCTION set_hhh_indiv(indiv_tbl TEXT, ids BIGINT[]) RETURNS TEXT AS $$
+CREATE OR REPLACE FUNCTION set_hhh_indiv(indiv_tbl TEXT, ids BIGINT[]) RETURNS BIGINT AS $$
 DECLARE
     fkcol TEXT = 'hhh_indiv_id';
-    sql   TEXT;
-    res   INTEGER;
+    sql    TEXT;
+    min_id BIGINT;
+    rows   INTEGER;
 BEGIN
-    sql = format('update %I'
-                 '   set %I = (select min(id) from unnest($1) id)'
-                 ' where id in (select unnest($1))', indiv_tbl, fkcol);
-    EXECUTE sql USING ids;
+    sql = format('update %I
+                     set %I = (select min(id) from unnest($1) id)
+                   where id in (select unnest($1))
+               returning %I', indiv_tbl, fkcol, fkcol);
+    EXECUTE sql INTO min_id USING ids;
 
-    GET DIAGNOSTICS res = ROW_COUNT;
-    RETURN res;
+    GET DIAGNOSTICS rows = ROW_COUNT;
+    --RAISE INFO 'Records updated: %', rows;
+    RETURN min_id;
 END;
 $$ LANGUAGE plpgsql;

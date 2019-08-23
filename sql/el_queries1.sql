@@ -118,7 +118,7 @@ select ic.elect_cycle,
  *  at the individual contribution records
  */
 select ic.elect_cycle,
-       ic.name,
+       i.name,
        ic.transaction_pgi,
        ic.transaction_tp,
        ic.entity_tp,
