@@ -1,2 +1,2 @@
+ANALYZE VERBOSE indiv_info;
 ANALYZE VERBOSE indiv;
-ANALYZE VERBOSE indiv2;

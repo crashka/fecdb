@@ -4,6 +4,15 @@
 drop materialized view donor_sum;
 drop materialized view donor_base;
 
+/*
+ *  Parse out comma- and space-delimited "components" (first/middle/last names, titles, suffixes,
+ *  etc.) of the `name` field for `indiv`
+ *
+ *  Terminology-wise, "parts" are comma-delimited components, and "words" are delimited by either
+ *  commas or spaces; note that commas and spaces should be trimmed and normalized by this point,
+ *  but we still trim the parts here to be sure (and there are some other possible outlier cases
+ *  as well, see scripts/fmt_indiv.awk)
+ */
 create or replace view indiv_parsed as
 select id,
        name,
@@ -30,10 +39,10 @@ select id,
 
 \if :create_donor_sum_directly
     /*
-     *  for some unknown reason, the following construction is giving the databse
+     *  for some unknown reason, the following construction is giving the database
      *  engine (PostgreSQL 10.10) lots of problems (it sometimes works, but most
-     *  of the time a parallel read spins the disk up to 100% and never returns),
-     *  so we break this into two steps (kind of stupid, but works reliably)
+     *  of the time a parallel read spins the disk up to 100% and the query never
+     *  returns)...
      */
     create materialized view donor_sum as
     select ip.part1                  as last_name,
@@ -53,6 +62,10 @@ select id,
        and ip.part1 !~ ' '
      group by 1, 2, 3;
 \else
+    /*
+     *  ...so we have to break this thing into two steps (kind of stupid, but seems
+     *   to work reliably)
+     */
     create materialized view donor_base as
     select ip.part1                  as last_name,
            substr(ip.part2, 1, 3)    as first_name_pfx,
@@ -132,54 +145,9 @@ select seg_def.seg_amt,
          where ds.total_amt > seg_def.seg_amt) as seg_stat on true;
 
 /*
- *  Now we create groups for sample records within each segment, and also
- *  connect the `indiv` records for each donor to a "base" indivual
+ *  Now we create donor segments for sample records within each segment, and
+ *  also connect the `indiv` records for each donor to a "base" indivual
  */
-
-\ir create_indiv_functions.sql
-
-CREATE OR REPLACE FUNCTION create_seg(seg_amt numeric, group_name text, group_desc text = null)
-RETURNS BIGINT AS $$
-DECLARE
-indiv_tbl TEXT = 'indiv';
-donor_sum RECORD;
-group_id  BIGINT;
-base_id   BIGINT;
-BEGIN
-    EXECUTE 'insert into indiv_group (name, description)
-             values ($1, $2)
-             returning id'
-    INTO group_id
-    USING group_name, group_desc;
-
-    FOR donor_sum IN
-        EXECUTE
-            'select last_name,
-                    first_name_pfx,
-                    zip_pfx,
-                    indiv_ids,
-                    contribs,
-                    total_amt,
-                    avg_amt
-               from donor_sum
-              where total_amt > $1
-              order by total_amt asc
-              limit 100'
-        USING seg_amt
-    LOOP
-        EXECUTE 'select set_base_indiv($1, $2)'
-        INTO base_id
-        USING indiv_tbl, donor_sum.indiv_ids;
-
-        EXECUTE
-            'insert into indiv_group_memb(indiv_group_id, base_indiv_id)
-             values ($1, $2)
-             on conflict do nothing'
-        USING group_id, base_id;
-    END LOOP;
-    RETURN group_id;
-END;
-$$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION human_readable(label TEXT) RETURNS TEXT AS $$
     SELECT regexp_replace(
@@ -191,47 +159,30 @@ CREATE OR REPLACE FUNCTION human_readable(label TEXT) RETURNS TEXT AS $$
                '0{3}([^0-9]|$)', 'K\1');
 $$ LANGUAGE SQL;
 
-/*
-with seg_def as (
-    select unnest(array[100000000,
-                        50000000,
-                        10000000,
-                        1000000,
-                        500000,
-                        100000,
-                        50000,
-                        10000,
-                        5000,
-                        2500,
-                        1000,
-                        500,
-                        0]) as seg_amt
-)
-select seg_def.seg_amt,
-       seg_group.group_name,
-       seg_group.group_id
-  from seg_def
-  join lateral
-       (select human_readable(concat('$', seg_def.seg_amt, '+ donors')) as seg_name)
-       as seg_desc on true
-  join lateral
-       (select seg_desc.seg_name                              as group_name,
-               create_seg(seg_def.seg_amt, seg_desc.seg_name) as group_id)
-       as seg_group on true;
-*/
+CREATE OR REPLACE FUNCTION create_donor_seg_by_amt(seg_amt NUMERIC, seg_size INTEGER = 100)
+RETURNS TABLE(seg_id BIGINT, seg_name TEXT) AS $$
+DECLARE
+sql      TEXT;
+seg_name TEXT;
+seg_desc TEXT = NULL;
+BEGIN
+    sql = format('select human_readable(concat(%L, $1, %L))', '$', '+ donors');
+    EXECUTE sql INTO seg_name USING seg_amt;
 
-CREATE OR REPLACE FUNCTION create_donor_seg_by_amt(seg_amt NUMERIC)
-RETURNS TABLE(seg_amt NUMERIC, group_name TEXT, group_id BIGINT) AS $$
-    select seg_amt,
-           seg_group.group_name,
-           seg_group.group_id
-      from (select human_readable(concat('$', seg_amt, '+ donors')) as seg_name)
-           as seg_info
-      join lateral
-           (select seg_info.seg_name                      as group_name,
-                   create_seg(seg_amt, seg_info.seg_name) as group_id)
-           as seg_group on true;
-$$ LANGUAGE SQL;
+    sql = 'with donor_set as (
+               select row(ds.indiv_ids)::id_array as ids
+                 from donor_sum ds
+                where ds.total_amt > $2
+                order by ds.total_amt asc
+                limit ($3)
+           )
+           select create_seg(array_agg(ids), $1),
+                  $1
+             from donor_set
+            group by 2';
+    RETURN QUERY EXECUTE sql USING seg_name, seg_amt, seg_size;
+END;
+$$ LANGUAGE plpgsql;
 
 with seg_def as (
     select unnest(array[100000000,
@@ -248,13 +199,43 @@ with seg_def as (
                         500,
                         0]) as seg_amt
 )
-select (create_donor_seg_by_amt(seg_def.seg_amt)).*
+select seg_def.seg_amt, (create_donor_seg_by_amt(seg_def.seg_amt)).*
   from seg_def;
 
-select g.id     as group_id,
-       g.name   as group_name,
-       count(*) as group_members
-  from indiv_group g
-  join indiv_group_memb gm on gm.indiv_group_id = g.id
+select ds.id    as seg_id,
+       ds.name  as seg_name,
+       count(*) as seg_members
+  from donor_seg ds
+  join donor_seg_memb dsm on dsm.donor_seg_id = ds.id
  group by 1, 2
  order by 1;
+
+with seg_donors as (
+    select dsm.base_indiv_id
+      from donor_seg ds
+      join donor_seg_memb dsm on dsm.donor_seg_id = ds.id
+     where ds.name = '$50M+ donors'
+)
+select i.id,
+       i.name,
+       i.city,
+       i.state,
+       i.zip_code
+  from seg_donors sd
+  join indiv i on i.id = sd.base_indiv_id
+ order by i.name, i.zip_code;
+
+with seg_donors as (
+    select dsm.base_indiv_id
+      from donor_seg ds
+      join donor_seg_memb dsm on dsm.donor_seg_id = ds.id
+     where ds.name = '$50M+ donors'
+)
+select i.id,
+       i.name,
+       i.city,
+       i.state,
+       i.zip_code
+  from seg_donors sd
+  join indiv i on i.base_indiv_id = sd.base_indiv_id
+ order by i.name, i.zip_code;

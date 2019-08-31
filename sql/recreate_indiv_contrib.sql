@@ -1,9 +1,19 @@
--- use hash join for `indiv_id` and `indiv2_id` fixups; alternative is nested
+-- use hash join for `indiv_info_id` and `indiv_id` fixups; alternative is nested
 -- loop, which is slower but predictably linear time
 \set use_hash_join true
 
 -- check for possible hash collisions
-select count(distinct i.hashkey) as collisions1
+select count(distinct ii.hashkey) as collisions1
+  from indiv_info ii
+ where exists
+       (select *
+          from indiv_info inner_ii
+         where inner_ii.hashkey = ii.hashkey
+           and inner_ii.id != ii.id
+       )
+\gset
+
+select count(distinct i.hashkey) as collisions2
   from indiv i
  where exists
        (select *
@@ -13,23 +23,13 @@ select count(distinct i.hashkey) as collisions1
        )
 \gset
 
-select count(distinct i2.hashkey) as collisions2
-  from indiv2 i2
- where exists
-       (select *
-          from indiv2 inner_i2
-         where inner_i2.hashkey = i2.hashkey
-           and inner_i2.id != i2.id
-       )
-\gset
-
 select (:collisions1 + :collisions2) = 0 as no_collisions
 \gset
 
--- in all cases, just create a clean copy of indiv_contrib with the `indiv`
--- and `indiv2` foreign keys added (rather than have UPDATE do it implicitly);
--- this also gives us a chance to make the table leaner (i.e. get rid of the
--- denorms and hashkeys)
+-- in all possible cases, we create a clean copy of `indiv_contrib` with the
+-- `indiv_info` and `indiv` foreign keys added (rather than have UPDATE do it
+-- implicitly); this also gives us a chance to make the table leaner (i.e. get
+-- rid of the denorms and hashkeys)
 \if :no_collisions
     \if :use_hash_join
         create table indiv_contrib_new as
@@ -50,11 +50,11 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
                ic.memo_text,
                ic.sub_id,
                ic.elect_cycle,
-               i.id as indiv_id,
-               i2.id as indiv2_id
+               ii.id as indiv_info_id,
+               i.id as indiv_id
           from indiv_contrib ic
-          left join indiv i on i.hashkey = ic.indiv_hashkey
-          left join indiv2 i2 on i2.hashkey = ic.indiv2_hashkey;
+          left join indiv_info ii on ii.hashkey = ic.indiv_info_hashkey
+          left join indiv i on i.hashkey = ic.indiv_hashkey;
     \else
         -- nested loop alternative
         create table indiv_contrib_new as
@@ -75,12 +75,12 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
                ic.memo_text,
                ic.sub_id,
                ic.elect_cycle,
+               (select ii.id
+                  from indiv_info ii
+                 where ii.hashkey = ic.indiv_info_hashkey) as indiv_info_id,
                (select i.id
                   from indiv i
-                 where i.hashkey = ic.indiv_hashkey) as indiv_id,
-               (select i2.id
-                  from indiv2 i2
-                 where i2.hashkey = ic.indiv2_hashkey) as indiv2_id
+                 where i.hashkey = ic.indiv_hashkey) as indiv_id
           from indiv_contrib ic;
     \endif
 \else
@@ -105,21 +105,21 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
                ic.memo_text,
                ic.sub_id,
                ic.elect_cycle,
-               i.id as indiv_id,
-               i2.id as indiv2_id
+               ii.id as indiv_info_id,
+               i.id as indiv_id
           from indiv_contrib ic
-          left join indiv i   on i.hashkey = ic.indiv_hashkey
-                             and coalesce(i.name, '')        = coalesce(ic.name, '')
-                             and coalesce(i.zip_code, '')    = coalesce(ic.zip_code, '')
-                             and coalesce(i.city, '')        = coalesce(ic.city, '')
-                             and coalesce(i.state, '')       = coalesce(ic.state, '')
-          left join indiv2 i2 on i2.hashkey = ic.indiv2_hashkey
-                             and coalesce(i2.name, '')       = coalesce(ic.name, '')
-                             and coalesce(i2.zip_code, '')   = coalesce(ic.zip_code, '')
-                             and coalesce(i2.city, '')       = coalesce(ic.city, '')
-                             and coalesce(i2.state, '')      = coalesce(ic.state, '')
-                             and coalesce(i2.employer, '')   = coalesce(ic.employer, '')
-                             and coalesce(i2.occupation, '') = coalesce(ic.occupation, '');
+          left join indiv_info ii  on ii.hashkey                  = ic.indiv_info_hashkey
+                                  and coalesce(ii.name, '')       = coalesce(ic.name, '')
+                                  and coalesce(ii.zip_code, '')   = coalesce(ic.zip_code, '')
+                                  and coalesce(ii.city, '')       = coalesce(ic.city, '')
+                                  and coalesce(ii.state, '')      = coalesce(ic.state, '')
+                                  and coalesce(ii.employer, '')   = coalesce(ic.employer, '')
+                                  and coalesce(ii.occupation, '') = coalesce(ic.occupation, '')
+          left join indiv i        on i.hashkey                   = ic.indiv_hashkey
+                                  and coalesce(i.name, '')        = coalesce(ic.name, '')
+                                  and coalesce(i.zip_code, '')    = coalesce(ic.zip_code, '')
+                                  and coalesce(i.city, '')        = coalesce(ic.city, '')
+                                  and coalesce(i.state, '')       = coalesce(ic.state, '');
     \else
         -- nested loop alternative
         create table indiv_contrib_new as
@@ -140,22 +140,22 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
                ic.memo_text,
                ic.sub_id,
                ic.elect_cycle,
+               (select ii.id
+                  from indiv_info ii
+                 where ii.hashkey                  = ic.indiv_info_hashkey
+                   and coalesce(ii.name, '')       = coalesce(ic.name, '')
+                   and coalesce(ii.zip_code, '')   = coalesce(ic.zip_code, '')
+                   and coalesce(ii.city, '')       = coalesce(ic.city, '')
+                   and coalesce(ii.state, '')      = coalesce(ic.state, '')
+                   and coalesce(ii.employer, '')   = coalesce(ic.employer, '')
+                   and coalesce(ii.occupation, '') = coalesce(ic.occupation, '')) as indiv_info_id,
                (select i.id
                   from indiv i
-                 where i.hashkey = ic.indiv_hashkey
+                 where i.hashkey                   = ic.indiv_hashkey
                    and coalesce(i.name, '')        = coalesce(ic.name, '')
                    and coalesce(i.zip_code, '')    = coalesce(ic.zip_code, '')
                    and coalesce(i.city, '')        = coalesce(ic.city, '')
-                   and coalesce(i.state, '')       = coalesce(ic.state, '')) as indiv_id,
-               (select i2.id
-                  from indiv2 i2
-                 where i2.hashkey = ic.indiv2_hashkey
-                   and coalesce(i2.name, '')       = coalesce(ic.name, '')
-                   and coalesce(i2.zip_code, '')   = coalesce(ic.zip_code, '')
-                   and coalesce(i2.city, '')       = coalesce(ic.city, '')
-                   and coalesce(i2.state, '')      = coalesce(ic.state, '')
-                   and coalesce(i2.employer, '')   = coalesce(ic.employer, '')
-                   and coalesce(i2.occupation, '') = coalesce(ic.occupation, '')) as indiv2_id
+                   and coalesce(i.state, '')       = coalesce(ic.state, '')) as indiv_id
           from indiv_contrib ic;
     \endif
 \endif
@@ -163,12 +163,12 @@ select (:collisions1 + :collisions2) = 0 as no_collisions
 -- integrity check
 select count(*) as null_ids1
   from indiv_contrib_new
- where indiv_id is null
+ where indiv_info_id is null
 \gset
 
 select count(*) as null_ids2
   from indiv_contrib_new
- where indiv2_id is null
+ where indiv_id is null
 \gset
 
 select (:null_ids1 + :null_ids2) = 0 as success
@@ -180,8 +180,8 @@ select (:null_ids1 + :null_ids2) = 0 as success
 
     ALTER TABLE indiv_contrib ADD PRIMARY KEY (id);
     ALTER TABLE indiv_contrib ALTER id ADD GENERATED BY DEFAULT AS IDENTITY;
-    ALTER TABLE indiv_contrib ADD FOREIGN KEY (indiv_id) REFERENCES indiv (id) ON DELETE SET NULL;
-    ALTER TABLE indiv_contrib ADD FOREIGN KEY (indiv2_id) REFERENCES indiv2 (id) ON DELETE SET NULL;
+    ALTER TABLE indiv_contrib ADD FOREIGN KEY (indiv_info_id) REFERENCES indiv_info (id) ON DELETE SET NULL;
+    ALTER TABLE indiv_contrib ADD FOREIGN KEY (indiv_id)      REFERENCES indiv (id)      ON DELETE SET NULL;
 
     CREATE VIEW indiv_contrib_fec AS
     SELECT ic.id,
@@ -192,12 +192,12 @@ select (:null_ids1 + :null_ids2) = 0 as success
            ic.image_num,
            ic.transaction_tp,
            ic.entity_tp,
-           i2.name,
-           i2.city,
-           i2.state,
-           i2.zip_code,
-           i2.employer,
-           i2.occupation,
+           ii.name,
+           ii.city,
+           ii.state,
+           ii.zip_code,
+           ii.employer,
+           ii.occupation,
            ic.transaction_dt,
            ic.transaction_amt,
            ic.other_id,
@@ -208,7 +208,7 @@ select (:null_ids1 + :null_ids2) = 0 as success
            ic.sub_id,
            ic.elect_cycle
       FROM indiv_contrib ic
-      JOIN indiv2 i2 ON i2.id = ic.indiv2_id;
+      JOIN indiv_info ii ON ii.id = ic.indiv_info_id;
 \else
     \echo indiv_ids not set (:null_ids1 :null_ids2), exiting...
     \quit

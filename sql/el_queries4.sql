@@ -89,6 +89,16 @@ select bc.elect_cycle,
  order by 1, 2;
 
 /*
+ *  TODO:
+ *    - Highlight election years vs. off-years
+ *    - Cumulative and by person
+ *    - Pattern for reporting/analyzing by donor and by segment
+ *        - Performance considerations by size of segment
+ */
+
+
+
+/*
  *  Cleanup context (drop in reverse order due to dependencies)
  */
 drop materialized view base_ec;

@@ -9,11 +9,6 @@
  *    - I'm wondering if there is something that could link the upticks together.
  */
 
-/*
- *  Ensure the views we need are in place
- */
-\ir create_views_indiv_master.sql
-
 select table_catalog,
        table_schema,
        table_name
@@ -465,6 +460,11 @@ select bc.contrib_dt,
          where bc3.contrib_dt <= bc.contrib_dt
        ) as cumul on true
  order by 1;
+
+/*
+ *  TODO:
+ *    - Progression by election cycle (individual cycle and cumulative stats)
+ */
 
 /*
  *  Clear the current context
