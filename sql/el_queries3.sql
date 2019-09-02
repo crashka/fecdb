@@ -9,11 +9,53 @@
  *    - I'm wondering if there is something that could link the upticks together.
  */
 
-select table_catalog,
-       table_schema,
-       table_name
-  from information_schema.views
- where table_name in ('base_indiv', 'hhh_indiv', 'bad_base_indiv_ids', 'bad_hhh_indiv_ids');
+/*
+ *  Clear the previous context, if it exists (allow the current context to persist
+ *  after the script is run); it's okay if any of these fail because the view does
+ *  not exist (but not okay if there is a dependency requiring CASCADE)
+ *
+ *  Note: if/when we do this right, we won't have to drop and recreate these views
+ *  (at least not the "_contrib" ones), but rather just refresh them based on some
+ *  higher-level context specification
+ */
+drop materialized view base_contrib;
+drop materialized view base_def;
+drop materialized view hh_contrib;
+drop materialized view hh_def;
+
+/*
+ *  Create views we need (TODO: make permanent in the schema, when we have finalized
+ *  the design of "indiv" vs "donor", representation of "household", etc.)
+ */
+create or replace view base_indiv as
+select *
+  from indiv
+ where id = base_indiv_id;
+
+create or replace view hhh_indiv as
+select *
+  from indiv
+ where id = hhh_indiv_id;
+
+/*
+ *  These two views are used to validate the integrity of the `base_indiv_id` and
+ *  `hhh_indiv_id` foreign keys (no rows returned indicates that the key points to
+ *  a well-formed "base" or "hhh" indiv record), since we don't have any other real
+ *  enforcement mechanism currently in the management of the keys
+ */
+create or replace view bad_base_indiv_ids as
+select i.*
+  from indiv i
+  join indiv base_i
+       on base_i.id = i.base_indiv_id
+ where base_i.base_indiv_id != base_i.id;
+
+create or replace view bad_hhh_indiv_ids as
+select i.*
+  from indiv i
+  join indiv hhh_i
+       on hhh_i.id = i.hhh_indiv_id
+ where hhh_i.hhh_indiv_id != hhh_i.id;
 
 /*
  *  Create household for working set identified in `el_queries1.sql`
@@ -137,7 +179,7 @@ analyze indiv;
  *  election cycle), but using `hhh_indiv`, to validate the `hhh_indiv_id`s--should
  *  yield the exact same results
  */
-with hhh_def as (
+with hh_def as (
     select *
       from hhh_indiv
      where name = 'SANDELL, JENNIFER'
@@ -148,8 +190,8 @@ select ic.elect_cycle,
        round(avg(ic.transaction_amt), 2) avg_amount,
        min(ic.transaction_amt) min_amount,
        max(ic.transaction_amt) max_amount
-  from hhh_def hhh
-  join indiv i on i.hhh_indiv_id = hhh.id
+  from hh_def hh
+  join indiv i on i.hhh_indiv_id = hh.id
   join indiv_contrib ic on ic.indiv_id = i.id
  group by 1
  order by 1;
@@ -197,7 +239,7 @@ select ic.elect_cycle,
  order by 1;
 
 /*
- *  Okay, now that we have the `hhh_def` and `base_def` CTEs verified, we can look at
+ *  Okay, now that we have the `hh_def` and `base_def` CTEs verified, we can look at
  *  patterns of contribution from the household (and later, the individuals)
  *
  *  We will now specify the "context" for the following sequence of queries (i.e. the
@@ -205,7 +247,7 @@ select ic.elect_cycle,
  *  could also continue using a CTE for this, but it gets a little cumbersome (not
  *  that there is a real performance penalty for doing so)
  */
-create materialized view hhh_def as
+create materialized view hh_def as
 select *
   from hhh_indiv
  where name = 'SANDELL, JENNIFER';
@@ -213,17 +255,17 @@ select *
 /*
  *  First, here's an aggregate summary of the household contributions
  */
-select hhh.id                  as hhh_id,
-       hhh.name                as hhh_name,
-       hhh.zip_code            as hhh_zip_code,
+select hh.id                   as hhh_id,
+       hh.name                 as hhh_name,
+       hh.zip_code             as hhh_zip_code,
        count(distinct i.id)    as hhh_indivs,
        count(*)                as num_contribs,
        min(ic.transaction_dt)  as first_contrib,
        max(ic.transaction_dt)  as last_contrib,
        sum(ic.transaction_amt) as total_amt,
        round(avg(ic.transaction_amt), 2) as avg_amt
-  from hhh_def hhh
-  join indiv i on i.hhh_indiv_id = hhh.id
+  from hh_def hh
+  join indiv i on i.hhh_indiv_id = hh.id
   join indiv_contrib ic on ic.indiv_id = i.id
  group by 1, 2, 3
  order by 2;
@@ -231,9 +273,9 @@ select hhh.id                  as hhh_id,
 /*
  *  And also a breakout by election cycle
  */
-select hhh.id                  as hhh_id,
-       hhh.name                as hhh_name,
-       hhh.zip_code            as hhh_zip_code,
+select hh.id                   as hhh_id,
+       hh.name                 as hhh_name,
+       hh.zip_code             as hhh_zip_code,
        ic.elect_cycle          as elect_cycle,
        count(distinct i.id)    as hhh_indivs,
        count(*)                as num_contribs,
@@ -241,8 +283,8 @@ select hhh.id                  as hhh_id,
        max(ic.transaction_dt)  as last_contrib,
        sum(ic.transaction_amt) as total_amt,
        round(avg(ic.transaction_amt), 2) as avg_amt
-  from hhh_def hhh
-  join indiv i on i.hhh_indiv_id = hhh.id
+  from hh_def hh
+  join indiv i on i.hhh_indiv_id = hh.id
   join indiv_contrib ic on ic.indiv_id = i.id
  group by 1, 2, 3, 4
  order by 2, 4;
@@ -257,8 +299,8 @@ select ic.id              as contrib_id,
        i.id               as donor_id,
        i.name             as donor_name,
        cmte.cmte_nm       as cmte_nm
-  from hhh_def hhh
-  join indiv i on i.hhh_indiv_id = hhh.id
+  from hh_def hh
+  join indiv i on i.hhh_indiv_id = hh.id
   join indiv_contrib ic on ic.indiv_id = i.id
   left join cmte
        on cmte.cmte_id = ic.cmte_id
@@ -288,8 +330,8 @@ select ic.transaction_dt  as contrib_dt,
        i.name             as donor_name,
        cmte.cmte_id       as cmte_id,
        cmte.cmte_nm       as cmte_nm
-  from hhh_def hhh
-  join indiv i on i.hhh_indiv_id = hhh.id
+  from hh_def hh
+  join indiv i on i.hhh_indiv_id = hh.id
   join indiv_contrib ic on ic.indiv_id = i.id
   left join cmte
        on cmte.cmte_id = ic.cmte_id
@@ -302,44 +344,35 @@ having count(*) > 1
  *  For now, we'll aggregate the contributions by date (dubiousness and all), since we
  *  are doing a time-based analysis here, as well as aggregating across donors within
  *  the household here (we can report by individual separately/later)
+ *
+ *  We create a materialized view for reuse
  */
+create materialized view hh_contrib as
 select ic.transaction_dt       as contrib_dt,
        sum(ic.transaction_amt) as contrib_amt,
        count(*)                as contribs,
        count(distinct i.name)  as donors,
        array_to_string(array_agg(distinct cmte.cmte_id), ', ')  as cmte_ids,
        array_to_string(array_agg(distinct cmte.cmte_nm), ' | ') as cmte_nms
-  from hhh_def hhh
-  join indiv i on i.hhh_indiv_id = hhh.id
+  from hh_def hh
+  join indiv i on i.hhh_indiv_id = hh.id
   join indiv_contrib ic on ic.indiv_id = i.id
   left join cmte
        on cmte.cmte_id = ic.cmte_id
        and cmte.elect_cycle = ic.elect_cycle
- group by 1
- order by 1;
+ group by 1;
+
+/*
+ *  Let's look at the data
+ */
+select *
+  from hh_contrib
+ order by contrib_dt;
 
 /*
  *  Let's add in the interval between contributions and relative amount (plus/minus
  *  compared to the previous contribution)
- *
- *  note that we could also define a materialized view for `hh_contrib`, but we are
- *  only using it twice between now and the end of the script, so we won't bother
  */
-with hh_contrib as (
-    select ic.transaction_dt       as contrib_dt,
-           sum(ic.transaction_amt) as contrib_amt,
-           count(*)                as contribs,
-           count(distinct i.name)  as donors,
-           array_to_string(array_agg(distinct cmte.cmte_id), ', ')  as cmte_ids,
-           array_to_string(array_agg(distinct cmte.cmte_nm), ' | ') as cmte_nms
-      from hhh_def hhh
-      join indiv i on i.hhh_indiv_id = hhh.id
-      join indiv_contrib ic on ic.indiv_id = i.id
-      left join cmte
-           on cmte.cmte_id = ic.cmte_id
-           and cmte.elect_cycle = ic.elect_cycle
-     group by 1
-)
 select hhc.contrib_dt,
        hhc.contrib_amt,
        hhc.cmte_ids,
@@ -360,21 +393,6 @@ select hhc.contrib_dt,
  *  And now we'll add some cumulative stats (commenting out the committee ID and name,
  *  for readability--you can refer to the previous result set for correlation)
  */
-with hh_contrib as (
-    select ic.transaction_dt       as contrib_dt,
-           sum(ic.transaction_amt) as contrib_amt,
-           count(*)                as contribs,
-           count(distinct i.name)  as donors,
-           array_to_string(array_agg(distinct cmte.cmte_id), ', ')  as cmte_ids,
-           array_to_string(array_agg(distinct cmte.cmte_nm), ' | ') as cmte_nms
-      from hhh_def hhh
-      join indiv i on i.hhh_indiv_id = hhh.id
-      join indiv_contrib ic on ic.indiv_id = i.id
-      left join cmte
-           on cmte.cmte_id = ic.cmte_id
-           and cmte.elect_cycle = ic.elect_cycle
-     group by 1
-)
 select hhc.contrib_dt,
        hhc.contrib_amt,
        --hhc.cmte_ids,
@@ -410,28 +428,28 @@ select hhc.contrib_dt,
  *  and execute the same query showing differential/cumulative contribution stats
  *
  *  Note that we are using the same pattern here for `base_def` and `base_contrib`
- *  (in terms of CTE vs. materialized view) as with the household queries above
+ *  (using materialized views vs. CTEs) as with the household queries above
  */
 create materialized view base_def as
 select *
   from base_indiv
  where name = 'SANDELL, SCOTT';
 
-with base_contrib as (
-    select ic.transaction_dt       as contrib_dt,
-           sum(ic.transaction_amt) as contrib_amt,
-           count(*)                as contribs,
-           count(distinct i.name)  as donors,
-           array_to_string(array_agg(distinct cmte.cmte_id), ', ')  as cmte_ids,
-           array_to_string(array_agg(distinct cmte.cmte_nm), ' | ') as cmte_nms
-      from base_def base
-      join indiv i on i.base_indiv_id = base.id
-      join indiv_contrib ic on ic.indiv_id = i.id
-      left join cmte
-           on cmte.cmte_id = ic.cmte_id
-           and cmte.elect_cycle = ic.elect_cycle
-     group by 1
-)
+create materialized view base_contrib as
+select ic.transaction_dt       as contrib_dt,
+       sum(ic.transaction_amt) as contrib_amt,
+       count(*)                as contribs,
+       count(distinct i.name)  as donors,
+       array_to_string(array_agg(distinct cmte.cmte_id), ', ')  as cmte_ids,
+       array_to_string(array_agg(distinct cmte.cmte_nm), ' | ') as cmte_nms
+  from base_def base
+  join indiv i on i.base_indiv_id = base.id
+  join indiv_contrib ic on ic.indiv_id = i.id
+  left join cmte
+       on cmte.cmte_id = ic.cmte_id
+       and cmte.elect_cycle = ic.elect_cycle
+ group by 1;
+
 select bc.contrib_dt,
        bc.contrib_amt,
        --bc.cmte_ids,
@@ -465,9 +483,3 @@ select bc.contrib_dt,
  *  TODO:
  *    - Progression by election cycle (individual cycle and cumulative stats)
  */
-
-/*
- *  Clear the current context
- */
-drop materialized view hhh_def;
-drop materialized view base_def;

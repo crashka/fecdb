@@ -6,20 +6,35 @@
  */
 
 /*
- *  This script requires the `contrib_to_314` view, which is defined in a separate
- *  file (to serve as a template for other similar view definitions)
+ *  Clear the previous context, if it exists (allow the current context to persist
+ *  after the script is run)
  */
-\ir create_view_contrib_to_314.sql
+drop materialized view top_314_donors;
 
-select table_catalog,
-       table_schema,
-       table_name
-  from information_schema.views
- where table_name = 'contrib_to_314';
+/*
+ *  Create a view to represent `indiv_contrib` records associated with any committee
+ *  whose name is prefixed by "314" (this can be amended if there are other patterns
+ *  representing the same PAC; currently there are no others with "314" elsewhere in
+ *  the name)
+ *
+ *  Note that this serves as a template for creating other segments of contributions,
+ *  and hence the donors (actually, just "individuals" for now) behind them, for doing
+ *  a similar type of investigation
+ */
+create or replace view contrib_to_314 as
+select cm.cmte_nm,
+       ic.*
+  from cmte cm
+  join indiv_contrib ic
+       on ic.cmte_id = cm.cmte_id
+ where cm.cmte_nm like '314%';
 
 /*
  *  Let's start by building working set for top 50 contributors to 314 (all time)
  *
+ *  Note that this materialized view can just be refreshed (rather than dropped and
+ *  recreated) if `contrib_to_314` (definition of 314-related PACs) is amended (see
+ *  note above)
  */
 create materialized view top_314_donors as
 select i.id as indiv_id,
@@ -378,9 +393,3 @@ select cm.cmte_nm as committee,
  where ic.transaction_amt < 0
  group by 1, 2, 3
  order by 5 asc, 3 asc;
-
-/*
- *  drop the working set for 314 contributors if/when done with it (or can leave it, and later REFRESH
- *  it if the underlying base table data changes)
- */
-drop materialized view top_314_donors;
