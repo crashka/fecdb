@@ -15,29 +15,29 @@
  *  it's okay if any of these fail because the view does not exist (but not if there is
  *  a dependency requiring CASCADE)
  */
-drop materialized view base_ec_sum;
-drop materialized view base_ec_contrib;
-drop materialized view base_ec_def;  -- see note below (creation of materialized view)
+drop materialized view donor_ec_sum;
+drop materialized view donor_ec_contrib;
+drop materialized view donor_ec_def;  -- see note below (creation of materialized view)
 
 /*
- *  Let's use this "base" indiv record (donor) as a stand-in while we develop the
- *  queries for reporting the timing of giving with a cycle; later we can replace
- *  `base_ec_def` with a donor segment
+ *  Let's use the following "donor" record as a stand-in while we develop the queries for
+ *  reporting the timing of giving with a cycle; later we can replace `donor_ec_def` with
+ *  a donor segment
  *
- *  Note that this is not a good name (`base_def` is better), but doing it this
- *  way to decouple this script from `el_queries3.sql`
+ *  Note that this is not a good name (`donor_def` is better), but doing it this way to
+ *  decouple this script from `el_queries3.sql`
  */
-create materialized view base_ec_def as
+create materialized view donor_ec_def as
 select *
-  from base_indiv
+  from donor_indiv
  where name = 'SANDELL, SCOTT';
 
 /*
  *  This view rerepsents all of the contributions from the party/parties specified by
- *  `base_ec_def`; note that multiple contributions on a given day (if/when it happens)
+ *  `donor_ec_def`; note that multiple contributions on a given day (if/when it happens)
  *  are lumped together as `contrib_dt`, to make the overall reporting simpler
  */
-create materialized view base_ec_contrib as
+create materialized view donor_ec_contrib as
 select ic.elect_cycle                                           as elect_cycle,
        ic.transaction_dt                                        as contrib_dt,
        sum(ic.transaction_amt)                                  as contrib_amt,
@@ -45,8 +45,8 @@ select ic.elect_cycle                                           as elect_cycle,
        count(distinct i.name)                                   as donors,
        array_to_string(array_agg(distinct cmte.cmte_id), ', ')  as cmte_ids,
        array_to_string(array_agg(distinct cmte.cmte_nm), ' | ') as cmte_nms
-  from base_ec_def base
-  join indiv i on i.base_indiv_id = base.id
+  from donor_ec_def d
+  join indiv i on i.donor_indiv_id = d.id
   join indiv_contrib ic on ic.indiv_id = i.id
   left join cmte
        on cmte.cmte_id = ic.cmte_id
@@ -59,7 +59,7 @@ select ic.elect_cycle                                           as elect_cycle,
  *  election date for the cycle (it goes without saying that negative is "before"
  *  the date, and positive is "after")
  */
-create materialized view base_ec_sum as
+create materialized view donor_ec_sum as
 select ec.key                                    as key,
        ec.election_day                           as election_day,
        count(*)                                  as contrib_dates,
@@ -69,7 +69,7 @@ select ec.key                                    as key,
        max(bec.contrib_dt)                       as latest,
        min(bec.contrib_dt) - ec.election_day     as erly_days_rel,
        max(bec.contrib_dt) - ec.election_day     as late_days_rel
-  from base_ec_contrib bec
+  from donor_ec_contrib bec
   join election_cycle ec on ec.key = bec.elect_cycle
  group by 1, 2;
 
@@ -78,18 +78,18 @@ select ec.key                                    as key,
  *  contributions (we can add a LIMIT to the query when working with larger segements)
  */
 select *
-  from base_ec_contrib
+  from donor_ec_contrib
  order by 1, 2;
 
 /*
  *  And next, the contribution aggregates by election cycle
  */
 select *
-  from base_ec_sum
+  from donor_ec_sum
  order by 1;
 
 /*
- *  For each of the contributions in `base_ec_contrib`, we now show the following:
+ *  For each of the contributions in `donor_ec_contrib`, we now show the following:
  *    - cycle_pct       : percentage of the total for the cycle
  *    - cumul_cycle_amt : cumulative amount for the cycle
  *    - cumul_cycle_pct : cumulative percentage for the cycle
@@ -107,15 +107,15 @@ select bec.elect_cycle,
        round(cumul.total_amt / bes.total_amt * 100.0, 1)
                                          as cumul_cycle_pct,
        bec.contrib_dt - bes.election_day as days_rel
-  from base_ec_contrib bec
-  join base_ec_sum bes on bes.key = bec.elect_cycle
+  from donor_ec_contrib bec
+  join donor_ec_sum bes on bes.key = bec.elect_cycle
   left join lateral
        (select count(*)                as contribs,
                nullif(count(*) - 1, 0) as intervals,
                sum(bec2.contrib_amt)   as total_amt,
                max(bec2.contrib_dt) - min(bec2.contrib_dt)
                                        as elapsed_days
-          from base_ec_contrib bec2
+          from donor_ec_contrib bec2
          where bec2.elect_cycle = bec.elect_cycle
            and bec2.contrib_dt <= bec.contrib_dt
        ) as cumul on true

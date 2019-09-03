@@ -317,7 +317,7 @@ CREATE TABLE IF NOT EXISTS indiv_info (
 -- reduction of the PII here (just distinct name and address values--no additional processing of
 -- those fields) to try and avoid discarding potentially discriminating information--from here,
 -- we can apply various algorithms, or even manual curation, to associate multiple records with
--- a "base" record representing a real life person.
+-- a "donor" record representing a real life person.
 --
 -- Notes:
 --   * We are specifying a lower FILLFACTOR than default (value is a total SWAG value for now),
@@ -338,15 +338,16 @@ CREATE TABLE IF NOT EXISTS indiv (
     title                TEXT,
     suffix               TEXT,
     elect_cycles         INTEGER[],
-    -- records deemed to represent the same individual (in real life) will all
-    -- point to a "base" record (FK constraint specified below); note, the base
-    -- record points to itself
-    base_indiv_id        BIGINT,
-    -- pointer to "head of household", works similarly to `base_indiv_id`, but
-    -- represents all records presumed tied to a household; note that this will
-    -- likely go away, since the same thing can be modeled using donor segments
-    -- (cleaner, but perhaps a little more difficult to script)
-    hhh_indiv_id         BIGINT
+    -- `indiv` records deemed to represent the same person (in real life) will all
+    -- point to a common/base "donor" record (FK constraint specified below); note
+    -- that all base donor records will actually also point to themselves
+    donor_indiv_id       BIGINT,
+    -- pointer to "head of household" record, works similarly to `donor_indiv_id`,
+    -- but tracks all records presumed to be tied to a common household; note that
+    -- this key will likely go away, since the same thing can be modeled using the
+    -- `indiv_seg` table (which is a cleaner approach, but perhaps slightly more
+    -- cumbersome to script)
+    hh_indiv_id          BIGINT
 )
 WITH (FILLFACTOR=70);
 
@@ -360,5 +361,5 @@ ALTER TABLE indiv_contrib ADD FOREIGN KEY (indiv_id) REFERENCES indiv (id) ON DE
 --
 -- foreign key constraints for `indiv`
 --
-ALTER TABLE indiv ADD FOREIGN KEY (base_indiv_id) REFERENCES indiv (id);
-ALTER TABLE indiv ADD FOREIGN KEY (hhh_indiv_id)  REFERENCES indiv (id);
+ALTER TABLE indiv ADD FOREIGN KEY (donor_indiv_id) REFERENCES indiv (id);
+ALTER TABLE indiv ADD FOREIGN KEY (hh_indiv_id) REFERENCES indiv (id);

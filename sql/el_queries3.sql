@@ -18,8 +18,8 @@
  *  (at least not the "_contrib" ones), but rather just refresh them based on some
  *  higher-level context specification
  */
-drop materialized view base_contrib;
-drop materialized view base_def;
+drop materialized view donor_contrib;
+drop materialized view donor_def;
 drop materialized view hh_contrib;
 drop materialized view hh_def;
 
@@ -27,35 +27,35 @@ drop materialized view hh_def;
  *  Create views we need (TODO: make permanent in the schema, when we have finalized
  *  the design of "indiv" vs "donor", representation of "household", etc.)
  */
-create or replace view base_indiv as
+create or replace view donor_indiv as
 select *
   from indiv
- where id = base_indiv_id;
+ where id = donor_indiv_id;
 
-create or replace view hhh_indiv as
+create or replace view hh_indiv as
 select *
   from indiv
- where id = hhh_indiv_id;
+ where id = hh_indiv_id;
 
 /*
- *  These two views are used to validate the integrity of the `base_indiv_id` and
- *  `hhh_indiv_id` foreign keys (no rows returned indicates that the key points to
- *  a well-formed "base" or "hhh" indiv record), since we don't have any other real
+ *  These two views are used to validate the integrity of the `donor_indiv_id` and
+ *  `hh_indiv_id` foreign keys (no rows returned indicates that the key points to
+ *  a well-formed "donor" or "hh" indiv record), since we don't have any other real
  *  enforcement mechanism currently in the management of the keys
  */
-create or replace view bad_base_indiv_ids as
+create or replace view bad_donor_indiv_ids as
 select i.*
   from indiv i
-  join indiv base_i
-       on base_i.id = i.base_indiv_id
- where base_i.base_indiv_id != base_i.id;
+  join indiv donor_i
+       on donor_i.id = i.donor_indiv_id
+ where donor_i.donor_indiv_id != donor_i.id;
 
-create or replace view bad_hhh_indiv_ids as
+create or replace view bad_hh_indiv_ids as
 select i.*
   from indiv i
-  join indiv hhh_i
-       on hhh_i.id = i.hhh_indiv_id
- where hhh_i.hhh_indiv_id != hhh_i.id;
+  join indiv hh
+       on hh.id = i.hh_indiv_id
+ where hh.hh_indiv_id != hh.id;
 
 /*
  *  Create household for working set identified in `el_queries1.sql`
@@ -67,59 +67,59 @@ with indiv_set as (
        and i.zip_code ~ '9402[58]'
 )
 update indiv
-   set hhh_indiv_id = (select min(id) from indiv_set)
+   set hh_indiv_id = (select min(id) from indiv_set)
  where id in (select id from indiv_set);
 
 /*
- *  Verify the `hhh_indiv` record just created, and validate that we can identify
+ *  Verify the `hh_indiv` record just created, and validate that we can identify
  *  it uniquely by `name` (both queries here should return exactly one row)
  */
-select hhh.id,
-       hhh.name,
-       hhh.city,
-       hhh.state,
-       hhh.zip_code
-  from hhh_indiv hhh
- where hhh.name like 'SANDELL, %'
-   and hhh.zip_code ~ '9402[58]';
+select hh.id,
+       hh.name,
+       hh.city,
+       hh.state,
+       hh.zip_code
+  from hh_indiv hh
+ where hh.name like 'SANDELL, %'
+   and hh.zip_code ~ '9402[58]';
 
 select *
-  from hhh_indiv
+  from hh_indiv
  where name = 'SANDELL, JENNIFER';
 
 /*
  *  Connect `indiv` records together for the first individual (more active donor)
- *  in the household; note that the choice of `min(id)` as the `hhh_indiv_id` is
+ *  in the household; note that the choice of `min(id)` as the `hh_indiv_id` is
  *  arbitrary, we can actually pick any one from the set
  */
 with indiv_set as (
     select i.*
-      from hhh_indiv hhh
-      join indiv i on i.hhh_indiv_id = hhh.id
+      from hh_indiv hh
+      join indiv i on i.hh_indiv_id = hh.id
                    and (i.name ~ 'SCOTT' and i.name !~ 'MRS\.')
-     where hhh.name = 'SANDELL, JENNIFER'
+     where hh.name = 'SANDELL, JENNIFER'
 )
 update indiv
-   set base_indiv_id = (select min(id) from indiv_set)
+   set donor_indiv_id = (select min(id) from indiv_set)
  where id in (select id from indiv_set);
 
 /*
- *  Verify the `base_indiv` record just created, and validate that we can identify
+ *  Verify the `donor_indiv` record just created, and validate that we can identify
  *  it uniquely by `name` (both queries here should return exactly one row)
  */
-select base.id,
-       base.name,
-       base.city,
-       base.state,
-       base.zip_code
-  from hhh_indiv hhh
-  join base_indiv base
-       on base.hhh_indiv_id = hhh.id
-       and (base.name ~ 'SCOTT' and base.name !~ 'MRS\.')
- where hhh.name = 'SANDELL, JENNIFER';
+select d.id,
+       d.name,
+       d.city,
+       d.state,
+       d.zip_code
+  from hh_indiv hh
+  join donor_indiv d
+       on d.hh_indiv_id = hh.id
+       and (d.name ~ 'SCOTT' and d.name !~ 'MRS\.')
+ where hh.name = 'SANDELL, JENNIFER';
 
 select *
-  from base_indiv
+  from donor_indiv
  where name = 'SANDELL, SCOTT';
 
 /*
@@ -130,58 +130,58 @@ select *
  */
 with indiv_set as (
     select i.*
-      from hhh_indiv hhh
-      join indiv i on i.hhh_indiv_id = hhh.id
+      from hh_indiv hh
+      join indiv i on i.hh_indiv_id = hh.id
                    and not (i.name ~ 'SCOTT' and i.name !~ 'MRS\.')
-     where hhh.name = 'SANDELL, JENNIFER'
+     where hh.name = 'SANDELL, JENNIFER'
 )
 update indiv
-   set base_indiv_id = (select min(id) from indiv_set)
+   set donor_indiv_id = (select min(id) from indiv_set)
  where id in (select id from indiv_set);
 
 /*
- *  Verify the `base_indiv` record just created, and validate that we can identify
+ *  Verify the `donor_indiv` record just created, and validate that we can identify
  *  it uniquely by `name` (both queries here should return exactly one row)
  */
-select base.id,
-       base.name,
-       base.city,
-       base.state,
-       base.zip_code
-  from hhh_indiv hhh
-  join base_indiv base
-       on base.hhh_indiv_id = hhh.id
-       and not (base.name ~ 'SCOTT' and base.name !~ 'MRS\.')
- where hhh.name = 'SANDELL, JENNIFER';
+select d.id,
+       d.name,
+       d.city,
+       d.state,
+       d.zip_code
+  from hh_indiv hh
+  join donor_indiv d
+       on d.hh_indiv_id = hh.id
+       and not (d.name ~ 'SCOTT' and d.name !~ 'MRS\.')
+ where hh.name = 'SANDELL, JENNIFER';
 
 select *
-  from base_indiv
+  from donor_indiv
  where name = 'SANDELL, JENNIFER';
 
 /*
- *  Now validate that the `hhh_indiv_id` and `base_indiv_id` keys are all good
+ *  Now validate that the `hh_indiv_id` and `donor_indiv_id` keys are all good
  *  (count should be zero for both queries)
  */
 select count(*)
-  from bad_hhh_indiv_ids;
+  from bad_hh_indiv_ids;
 
 select count(*)
-  from bad_base_indiv_ids;
+  from bad_donor_indiv_ids;
 
 /*
  *  Need to re-analyze the tables to let the optimizer know there is now data in the
- *  `hhh_indiv_id` and `base_indiv_id` columns
+ *  `hh_indiv_id` and `donor_indiv_id` columns
  */
 analyze indiv;
 
 /*
  *  Now let's repeat the query from `el_queries1.sql` for household contributions by
- *  election cycle), but using `hhh_indiv`, to validate the `hhh_indiv_id`s--should
+ *  election cycle), but using `hh_indiv`, to validate the `hh_indiv_id`s--should
  *  yield the exact same results
  */
 with hh_def as (
     select *
-      from hhh_indiv
+      from hh_indiv
      where name = 'SANDELL, JENNIFER'
 )
 select ic.elect_cycle,
@@ -191,18 +191,18 @@ select ic.elect_cycle,
        min(ic.transaction_amt) min_amount,
        max(ic.transaction_amt) max_amount
   from hh_def hh
-  join indiv i on i.hhh_indiv_id = hh.id
+  join indiv i on i.hh_indiv_id = hh.id
   join indiv_contrib ic on ic.indiv_id = i.id
  group by 1
  order by 1;
 
 /*
- *  For fun (and to validate `base_indiv`), let's break out contributions made by
+ *  For fun (and to validate `donor_indiv`), let's break out contributions made by
  *  the first individual (more active donor) in the household
  */
-with base_def as (
+with donor_def as (
     select *
-      from base_indiv
+      from donor_indiv
      where name = 'SANDELL, SCOTT'
 )
 select ic.elect_cycle,
@@ -211,8 +211,8 @@ select ic.elect_cycle,
        round(avg(ic.transaction_amt), 2) avg_amount,
        min(ic.transaction_amt) min_amount,
        max(ic.transaction_amt) max_amount
-  from base_def base
-  join indiv i on i.base_indiv_id = base.id
+  from donor_def d
+  join indiv i on i.donor_indiv_id = d.id
   join indiv_contrib ic on ic.indiv_id = i.id
  group by 1
  order by 1;
@@ -221,9 +221,9 @@ select ic.elect_cycle,
  *  And now, the same for the second individual (these two queries should add up to
  *  the household result, above)
  */
-with base_def as (
+with donor_def as (
     select *
-      from base_indiv
+      from donor_indiv
      where name = 'SANDELL, JENNIFER'
 )
 select ic.elect_cycle,
@@ -232,14 +232,14 @@ select ic.elect_cycle,
        round(avg(ic.transaction_amt), 2) avg_amount,
        min(ic.transaction_amt) min_amount,
        max(ic.transaction_amt) max_amount
-  from base_def base
-  join indiv i on i.base_indiv_id = base.id
+  from donor_def d
+  join indiv i on i.donor_indiv_id = d.id
   join indiv_contrib ic on ic.indiv_id = i.id
  group by 1
  order by 1;
 
 /*
- *  Okay, now that we have the `hh_def` and `base_def` CTEs verified, we can look at
+ *  Okay, now that we have the `hh_def` and `donor_def` CTEs verified, we can look at
  *  patterns of contribution from the household (and later, the individuals)
  *
  *  We will now specify the "context" for the following sequence of queries (i.e. the
@@ -249,23 +249,23 @@ select ic.elect_cycle,
  */
 create materialized view hh_def as
 select *
-  from hhh_indiv
+  from hh_indiv
  where name = 'SANDELL, JENNIFER';
 
 /*
  *  First, here's an aggregate summary of the household contributions
  */
-select hh.id                   as hhh_id,
-       hh.name                 as hhh_name,
-       hh.zip_code             as hhh_zip_code,
-       count(distinct i.id)    as hhh_indivs,
+select hh.id                   as hh_id,
+       hh.name                 as hh_name,
+       hh.zip_code             as hh_zip_code,
+       count(distinct i.id)    as hh_indivs,
        count(*)                as num_contribs,
        min(ic.transaction_dt)  as first_contrib,
        max(ic.transaction_dt)  as last_contrib,
        sum(ic.transaction_amt) as total_amt,
        round(avg(ic.transaction_amt), 2) as avg_amt
   from hh_def hh
-  join indiv i on i.hhh_indiv_id = hh.id
+  join indiv i on i.hh_indiv_id = hh.id
   join indiv_contrib ic on ic.indiv_id = i.id
  group by 1, 2, 3
  order by 2;
@@ -273,18 +273,18 @@ select hh.id                   as hhh_id,
 /*
  *  And also a breakout by election cycle
  */
-select hh.id                   as hhh_id,
-       hh.name                 as hhh_name,
-       hh.zip_code             as hhh_zip_code,
+select hh.id                   as hh_id,
+       hh.name                 as hh_name,
+       hh.zip_code             as hh_zip_code,
        ic.elect_cycle          as elect_cycle,
-       count(distinct i.id)    as hhh_indivs,
+       count(distinct i.id)    as hh_indivs,
        count(*)                as num_contribs,
        min(ic.transaction_dt)  as first_contrib,
        max(ic.transaction_dt)  as last_contrib,
        sum(ic.transaction_amt) as total_amt,
        round(avg(ic.transaction_amt), 2) as avg_amt
   from hh_def hh
-  join indiv i on i.hhh_indiv_id = hh.id
+  join indiv i on i.hh_indiv_id = hh.id
   join indiv_contrib ic on ic.indiv_id = i.id
  group by 1, 2, 3, 4
  order by 2, 4;
@@ -300,7 +300,7 @@ select ic.id              as contrib_id,
        i.name             as donor_name,
        cmte.cmte_nm       as cmte_nm
   from hh_def hh
-  join indiv i on i.hhh_indiv_id = hh.id
+  join indiv i on i.hh_indiv_id = hh.id
   join indiv_contrib ic on ic.indiv_id = i.id
   left join cmte
        on cmte.cmte_id = ic.cmte_id
@@ -331,7 +331,7 @@ select ic.transaction_dt  as contrib_dt,
        cmte.cmte_id       as cmte_id,
        cmte.cmte_nm       as cmte_nm
   from hh_def hh
-  join indiv i on i.hhh_indiv_id = hh.id
+  join indiv i on i.hh_indiv_id = hh.id
   join indiv_contrib ic on ic.indiv_id = i.id
   left join cmte
        on cmte.cmte_id = ic.cmte_id
@@ -355,7 +355,7 @@ select ic.transaction_dt       as contrib_dt,
        array_to_string(array_agg(distinct cmte.cmte_id), ', ')  as cmte_ids,
        array_to_string(array_agg(distinct cmte.cmte_nm), ' | ') as cmte_nms
   from hh_def hh
-  join indiv i on i.hhh_indiv_id = hh.id
+  join indiv i on i.hh_indiv_id = hh.id
   join indiv_contrib ic on ic.indiv_id = i.id
   left join cmte
        on cmte.cmte_id = ic.cmte_id
@@ -427,23 +427,23 @@ select hhc.contrib_dt,
  *  view for the more active donor in the household (based on the CTE used above),
  *  and execute the same query showing differential/cumulative contribution stats
  *
- *  Note that we are using the same pattern here for `base_def` and `base_contrib`
+ *  Note that we are using the same pattern here for `donor_def` and `donor_contrib`
  *  (using materialized views vs. CTEs) as with the household queries above
  */
-create materialized view base_def as
+create materialized view donor_def as
 select *
-  from base_indiv
+  from donor_indiv
  where name = 'SANDELL, SCOTT';
 
-create materialized view base_contrib as
+create materialized view donor_contrib as
 select ic.transaction_dt       as contrib_dt,
        sum(ic.transaction_amt) as contrib_amt,
        count(*)                as contribs,
        count(distinct i.name)  as donors,
        array_to_string(array_agg(distinct cmte.cmte_id), ', ')  as cmte_ids,
        array_to_string(array_agg(distinct cmte.cmte_nm), ' | ') as cmte_nms
-  from base_def base
-  join indiv i on i.base_indiv_id = base.id
+  from donor_def d
+  join indiv i on i.donor_indiv_id = d.id
   join indiv_contrib ic on ic.indiv_id = i.id
   left join cmte
        on cmte.cmte_id = ic.cmte_id
@@ -460,10 +460,10 @@ select bc.contrib_dt,
        bc.contrib_amt - prev.contrib_amt          as relative_amt,
        cumul.total_amt                            as cumul_total_amt,
        round(cumul.total_amt / cumul.contribs, 2) as cumul_avg_amt
-  from base_contrib bc
+  from donor_contrib bc
   left join lateral
        (select *
-          from base_contrib bc2
+          from donor_contrib bc2
          where bc2.contrib_dt < bc.contrib_dt
          order by bc2.contrib_dt desc
          limit 1
@@ -474,7 +474,7 @@ select bc.contrib_dt,
                sum(bc3.contrib_amt)    as total_amt,
                max(bc3.contrib_dt) - min(bc3.contrib_dt)
                                        as elapsed_days
-          from base_contrib bc3
+          from donor_contrib bc3
          where bc3.contrib_dt <= bc.contrib_dt
        ) as cumul on true
  order by 1;

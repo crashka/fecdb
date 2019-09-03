@@ -18,3 +18,6 @@ psql -ef sql/analyze_tables0.sql fec16
 psql -ef sql/recreate_indiv_contrib.sql fec16
 psql -ef sql/create_indexes.sql fec16
 psql -ef sql/analyze_tables.sql fec16
+
+psql -ef sql/create_donor_support.sql fec16
+psql -ef sql/create_donor_seg_support.sql fec16

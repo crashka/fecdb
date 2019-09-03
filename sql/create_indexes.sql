@@ -71,4 +71,5 @@ CREATE UNIQUE INDEX indiv_user_key         ON indiv (name, zip_code, city, state
 CREATE INDEX indiv_state_city              ON indiv (state, city);
 CREATE INDEX indiv_zip_code                ON indiv (zip_code);
 CREATE INDEX indiv_last_name_first_name    ON indiv (last_name, first_name);
-CREATE INDEX indiv_base_indiv_id           ON indiv (base_indiv_id);
+CREATE INDEX indiv_donor_indiv_id          ON indiv (donor_indiv_id);
+CREATE INDEX indiv_hh_indiv_id             ON indiv (hh_indiv_id);

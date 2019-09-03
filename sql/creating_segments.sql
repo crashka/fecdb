@@ -2,7 +2,7 @@
 \set create_donor_sum_directly false
 
 drop materialized view donor_sum;
-drop materialized view donor_base;
+drop materialized view indiv_group;
 
 /*
  *  Parse out comma- and space-delimited "components" (first/middle/last names, titles, suffixes,
@@ -66,7 +66,7 @@ select id,
      *  ...so we have to break this thing into two steps (kind of stupid, but seems
      *   to work reliably)
      */
-    create materialized view donor_base as
+    create materialized view indiv_group as
     select ip.part1                  as last_name,
            substr(ip.part2, 1, 3)    as first_name_pfx,
            substr(ip.zip_code, 1, 3) as zip_pfx,
@@ -81,29 +81,29 @@ select id,
 
     /*
      *  Not sure whether it is better to re-aggregate the unnested ids (even though
-     *  we are not able to omit the `distinct` qualifier), or select `db.indiv_ids`
+     *  we are not able to omit the `distinct` qualifier), or select `ig.indiv_ids`
      *  and add to GROUP BY clause--voting for the former option right now
      */
     create materialized view donor_sum as
-    with donor_base_indiv as (
-        select db.last_name,
-               db.first_name_pfx,
-               db.zip_pfx,
-               --db.indiv_ids,
-               unnest(db.indiv_ids) as indiv_id
-          from donor_base db
+    with indiv_group_memb as (
+        select ig.last_name,
+               ig.first_name_pfx,
+               ig.zip_pfx,
+               --ig.indiv_ids,
+               unnest(ig.indiv_ids) as indiv_id
+          from indiv_group ig
     )
-    select dbi.last_name,
-           dbi.first_name_pfx,
-           dbi.zip_pfx,
-           array_agg(distinct dbi.indiv_id)
+    select igm.last_name,
+           igm.first_name_pfx,
+           igm.zip_pfx,
+           array_agg(distinct igm.indiv_id)
                                      as indiv_ids,
            count(ic.transaction_amt) as contribs,
            sum(ic.transaction_amt)   as total_amt,
            round(sum(ic.transaction_amt) / count(ic.transaction_amt), 2)
                                      as avg_amt
-      from donor_base_indiv dbi
-      join indiv_contrib ic on ic.indiv_id = dbi.indiv_id
+      from indiv_group_memb igm
+      join indiv_contrib ic on ic.indiv_id = igm.indiv_id
      group by 1, 2, 3;
 \endif
 
@@ -145,10 +145,8 @@ select seg_def.seg_amt,
          where ds.total_amt > seg_def.seg_amt) as seg_stat on true;
 
 /*
- *  Now we create donor segments for sample records within each segment, and
- *  also connect the `indiv` records for each donor to a "base" indivual
+ *  Utility function to help with naming of segments
  */
-
 CREATE OR REPLACE FUNCTION human_readable(label TEXT) RETURNS TEXT AS $$
     SELECT regexp_replace(
                regexp_replace(
@@ -159,6 +157,10 @@ CREATE OR REPLACE FUNCTION human_readable(label TEXT) RETURNS TEXT AS $$
                '0{3}([^0-9]|$)', 'K\1');
 $$ LANGUAGE SQL;
 
+/*
+ *  Now we create donor segments for sample records within each segment, and also
+ *  connect the `indiv` records for each donor to a base indivual record
+ */
 CREATE OR REPLACE FUNCTION create_donor_seg_by_amt(seg_amt NUMERIC, seg_size INTEGER = 100)
 RETURNS TABLE(seg_id BIGINT, seg_name TEXT) AS $$
 DECLARE
@@ -176,7 +178,7 @@ BEGIN
                 order by ds.total_amt asc
                 limit ($3)
            )
-           select create_seg(array_agg(ids), $1),
+           select create_donor_seg(array_agg(ids), $1),
                   $1
              from donor_set
             group by 2';
@@ -211,7 +213,7 @@ select ds.id    as seg_id,
  order by 1;
 
 with seg_donors as (
-    select dsm.base_indiv_id
+    select dsm.donor_indiv_id
       from donor_seg ds
       join donor_seg_memb dsm on dsm.donor_seg_id = ds.id
      where ds.name = '$50M+ donors'
@@ -222,11 +224,11 @@ select i.id,
        i.state,
        i.zip_code
   from seg_donors sd
-  join indiv i on i.id = sd.base_indiv_id
+  join indiv i on i.id = sd.donor_indiv_id
  order by i.name, i.zip_code;
 
 with seg_donors as (
-    select dsm.base_indiv_id
+    select dsm.donor_indiv_id
       from donor_seg ds
       join donor_seg_memb dsm on dsm.donor_seg_id = ds.id
      where ds.name = '$50M+ donors'
@@ -237,5 +239,5 @@ select i.id,
        i.state,
        i.zip_code
   from seg_donors sd
-  join indiv i on i.base_indiv_id = sd.base_indiv_id
+  join indiv i on i.donor_indiv_id = sd.donor_indiv_id
  order by i.name, i.zip_code;

@@ -183,6 +183,9 @@ select (:null_ids1 + :null_ids2) = 0 as success
     ALTER TABLE indiv_contrib ADD FOREIGN KEY (indiv_info_id) REFERENCES indiv_info (id) ON DELETE SET NULL;
     ALTER TABLE indiv_contrib ADD FOREIGN KEY (indiv_id)      REFERENCES indiv (id)      ON DELETE SET NULL;
 
+    DROP INDEX indiv_info_hashkey;
+    DROP INDEX indiv_hashkey;
+
     CREATE VIEW indiv_contrib_fec AS
     SELECT ic.id,
            ic.cmte_id,

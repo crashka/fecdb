@@ -1,38 +1,38 @@
 --
---  base_indiv (rename to `donor`???)
+--  donor_indiv
 --
-create or replace view base_indiv as
+create or replace view donor_indiv as
 select *
   from indiv
- where id = base_indiv_id;
+ where id = donor_indiv_id;
 
 --
---  hhh_indiv
+--  hh_indiv
 --
-create or replace view hhh_indiv as
+create or replace view hh_indiv as
 select *
   from indiv
- where id = hhh_indiv_id;
+ where id = hh_indiv_id;
 
 --
---  bad_base_indiv_ids
+--  bad_donor_indiv_ids
 --
-create or replace view bad_base_indiv_ids as
+create or replace view bad_donor_indiv_ids as
 select i.*
   from indiv i
-  join indiv base_i
-       on base_i.id = i.base_indiv_id
- where base_i.base_indiv_id != base_i.id;
+  join indiv donor
+       on donor.id = i.donor_indiv_id
+ where donor.donor_indiv_id != donor.id;
 
 --
---  bad_hhh_indiv_ids
+--  bad_hh_indiv_ids
 --
-create or replace view bad_hhh_indiv_ids as
+create or replace view bad_hh_indiv_ids as
 select i.*
   from indiv i
-  join indiv hhh_i
-       on hhh_i.id = i.hhh_indiv_id
- where hhh_i.hhh_indiv_id != hhh_i.id;
+  join indiv hh
+       on hh.id = i.hh_indiv_id
+ where hh.hh_indiv_id != hh.id;
 
 --
 --  note that we could combine these two functions by parameterizing `fkcol`, but that
@@ -52,12 +52,12 @@ select i.*
 --             and i.zip_code ~ '9402[58]'
 --             and i.name !~ 'MRS\.'
 --      )
---      select set_base_indiv('indiv', array_agg(id)) as base_indiv_id
+--      select set_donor_indiv('indiv', array_agg(id)) as donor_indiv_id
 --        from indiv_set;
 --
-CREATE OR REPLACE FUNCTION set_base_indiv(indiv_tbl TEXT, ids BIGINT[]) RETURNS BIGINT AS $$
+CREATE OR REPLACE FUNCTION set_donor_indiv(indiv_tbl TEXT, ids BIGINT[]) RETURNS BIGINT AS $$
 DECLARE
-    fkcol  TEXT = 'base_indiv_id';
+    fkcol  TEXT = 'donor_indiv_id';
     sql    TEXT;
     min_id BIGINT;
     rows   INTEGER;
@@ -83,12 +83,12 @@ $$ LANGUAGE plpgsql;
 --           where i.name like 'SANDELL, %'
 --             and i.zip_code ~ '9402[58]'
 --      )
---      select set_hhh_indiv('indiv', array_agg(id)) as hhh_indiv_id
+--      select set_hh_indiv('indiv', array_agg(id)) as hh_indiv_id
 --        from indiv_set;
 --
-CREATE OR REPLACE FUNCTION set_hhh_indiv(indiv_tbl TEXT, ids BIGINT[]) RETURNS BIGINT AS $$
+CREATE OR REPLACE FUNCTION set_hh_indiv(indiv_tbl TEXT, ids BIGINT[]) RETURNS BIGINT AS $$
 DECLARE
-    fkcol TEXT = 'hhh_indiv_id';
+    fkcol  TEXT = 'hh_indiv_id';
     sql    TEXT;
     min_id BIGINT;
     rows   INTEGER;
