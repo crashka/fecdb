@@ -15,9 +15,9 @@
  *  it's okay if any of these fail because the view does not exist (but not if there is
  *  a dependency requiring CASCADE)
  */
-drop materialized view donor_ec_sum;
-drop materialized view donor_ec_contrib;
-drop materialized view donor_ec_def;  -- see note below (creation of materialized view)
+drop materialized view if exists donor_ec_sum;
+drop materialized view if exists donor_ec_contrib;
+drop materialized view if exists donor_ec_def;  -- see note below (creation of materialized view)
 
 /*
  *  Let's use the following "donor" record as a stand-in while we develop the queries for

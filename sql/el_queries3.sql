@@ -18,10 +18,10 @@
  *  (at least not the "_contrib" ones), but rather just refresh them based on some
  *  higher-level context specification
  */
-drop materialized view donor_contrib;
-drop materialized view donor_def;
-drop materialized view hh_contrib;
-drop materialized view hh_def;
+drop materialized view if exists donor_contrib;
+drop materialized view if exists donor_def;
+drop materialized view if exists hh_contrib;
+drop materialized view if exists hh_def;
 
 /*
  *  Create views we need (TODO: make permanent in the schema, when we have finalized

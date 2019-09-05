@@ -9,7 +9,7 @@
  *  Clear the previous context, if it exists (allow the current context to persist
  *  after the script is run)
  */
-drop materialized view top_314_donors;
+drop materialized view if exists top_314_donors;
 
 /*
  *  Create a view to represent `indiv_contrib` records associated with any committee

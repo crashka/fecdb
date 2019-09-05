@@ -21,3 +21,5 @@ psql -ef sql/analyze_tables.sql fec16
 
 psql -ef sql/create_donor_support.sql fec16
 psql -ef sql/create_donor_seg_support.sql fec16
+psql -ef sql/create_indiv_seg_support.sql fec16
+psql -ef sql/create_name_parsing_support.sql fec16

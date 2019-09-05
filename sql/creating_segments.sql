@@ -1,41 +1,9 @@
 -- see comment below
 \set create_donor_sum_directly false
 
-drop materialized view donor_sum;
-drop materialized view indiv_group;
-
-/*
- *  Parse out comma- and space-delimited "components" (first/middle/last names, titles, suffixes,
- *  etc.) of the `name` field for `indiv`
- *
- *  Terminology-wise, "parts" are comma-delimited components, and "words" are delimited by either
- *  commas or spaces; note that commas and spaces should be trimmed and normalized by this point,
- *  but we still trim the parts here to be sure (and there are some other possible outlier cases
- *  as well, see scripts/fmt_indiv.awk)
- */
-create or replace view indiv_parsed as
-select id,
-       name,
-       city,
-       state,
-       zip_code,
-       array_length(name_parts, 1) num_parts,
-       array_length(name_words, 1) num_words,
-       nullif(trim(name_parts[1]), '') as part1,
-       nullif(trim(name_parts[2]), '') as part2,
-       nullif(trim(name_parts[3]), '') as part3,
-       nullif(trim(array_to_string(name_parts[4:], ',')), '') as other_parts,
-       array_length(regexp_split_to_array(trim(name_parts[1]), '\s+'), 1) as part1_words,
-       array_length(regexp_split_to_array(trim(name_parts[2]), '\s+'), 1) as part2_words,
-       array_length(regexp_split_to_array(trim(name_parts[3]), '\s+'), 1) as part3_words
-  from (select i.id,
-               i.name,
-               i.city,
-               i.state,
-               i.zip_code,
-               string_to_array(i.name, ',') as name_parts,
-               regexp_split_to_array(i.name, '[\s,]+') as name_words
-          from indiv i) as name_segments;
+drop table if exists seg_def;
+drop materialized view if exists donor_sum;
+drop materialized view if exists indiv_group;
 
 \if :create_donor_sum_directly
     /*
@@ -115,23 +83,26 @@ select count(*) as num_donors,
   from donor_sum
 \gset
 
-select :num_donors, :sum_total_amt;
+select to_char(:num_donors,    '999,999,999')        as num_donors,
+       to_char(:sum_total_amt, '999,999,999,999.99') as sum_total_amt
 
-with seg_def as (
-    select unnest(array[100000000,
-                        50000000,
-                        10000000,
-                        1000000,
-                        500000,
-                        100000,
-                        50000,
-                        10000,
-                        5000,
-                        2500,
-                        1000,
-                        500,
-                        0]) as seg_amt
-)
+create temporary table seg_def as
+select unnest(array[100000000,
+                    50000000,
+                    10000000,
+                    5000000,
+                    1000000,
+                    500000,
+                    100000,
+                    50000,
+                    10000,
+                    5000,
+                    2500,
+                    1000,
+                    500,
+                    250,
+                    0]) as seg_amt;
+
 select seg_def.seg_amt,
        seg_stat.donors,
        seg_stat.pct_donors,
@@ -186,21 +157,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-with seg_def as (
-    select unnest(array[100000000,
-                        50000000,
-                        10000000,
-                        1000000,
-                        500000,
-                        100000,
-                        50000,
-                        10000,
-                        5000,
-                        2500,
-                        1000,
-                        500,
-                        0]) as seg_amt
-)
 select seg_def.seg_amt, (create_donor_seg_by_amt(seg_def.seg_amt)).*
   from seg_def;
 
