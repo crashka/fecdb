@@ -1,0 +1,8 @@
+psycopg2-binary
+sqlalchemy
+#pgspecial
+pandas
+jupyter
+ipython-sql
+matplotlib
+seaborn
