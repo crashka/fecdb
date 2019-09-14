@@ -14,19 +14,33 @@ how to create contexts for querying, based on common use cases:
 * `dc7_ctx_dseg_top_314_donors`
 
 Note that each notebook also creates the dependent ("downstream") contexts that are
-implicitly determined by the principal context defined in each case.  See the individual
-(lower case "i") notebooks for explanations and discussion.
+implicitly determined by the principal context defined in each case.
+
+| Principal Context | Dependent Contexts |
+| --- | --- |
+| `ctx_indiv` | `ctx_indiv_contrib` |
+| `ctx_donor` | `ctx_donor_contrib`<br/>`ctx_indiv`<br/>`ctx_indiv_contrib` |
+| `ctx_household` | `ctx_indiv`<br/>`ctx_indiv_contrib` |
+| `ctx_iseg` | (`ctx_iseg_memb`)<br/>`ctx_indiv`<br/>`ctx_indiv_contrib` |
+| `ctx_dseg` | (`ctx_dseg_memb`)<br/>`ctx_donor`<br/>`ctx_donor_contrib`<br/>`ctx_indiv`<br/>`ctx_indiv_contrib` |
+
+See the individual (lower case "i") notebooks for explanations and discussion.
+
 
 ## Query Context ##
 
 Once a principal context and its dependent contexts have been defined, the notebooks
-in this directory can be used as examples for forming queries on the various contexts
-that may be set:
+in the `query_context` directory can be used as examples for forming queries on the
+various contexts that may be set:
 
-* `qc1_ctx_contrib`
-* `qc2_ctx_contrib_donor`
-* `qc3_ctx_indiv`
-* `qc4_ctx_donor`
-* `qc5_ctx_household`
-* `qc6_ctx_iseg`
+* `qc1_ctx_indiv_contrib`
+* `qc2_ctx_indiv`
+* `qc3_ctx_household`
+* `qc4_ctx_iseg`
+* `qc5_ctx_donor_contrib`
+* `qc6_ctx_donor`
 * `qc7_ctx_dseg`
+
+Note that segment membership context views (`ctx_iseg_memb` and `ctx_dseg_memb`) are not
+typically used (though available nonetheless) for querying, thus sample notebooks are not
+provided for them here.
