@@ -2,7 +2,7 @@
 <html>
 <head><meta charset="utf-8" />
 
-<title>dc4_ctx_household_by_last_name_zip</title>
+<title>qc3_ctx_household</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
@@ -13077,17 +13077,12 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h1>Define Household Context &ndash; Based on Last Name and Zip Code</h1>
-<h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Explore the FEC data by specifying SQL predicates identifying <strong>Households</strong> (defined based on <code>indiv</code> records conjectured to represent real-world people residing at the same physical address).</p>
+<h1 id="Query-by-Household">Query by Household<a class="anchor-link" href="#Query-by-Household">&#182;</a></h1><h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Explore the FEC data by specifying SQL predicates identifying "households" (defined based on <code>indiv</code> records conjectured to represent real-world people residing at the same physical address)</p>
 <p>This approach will create the following query contexts:</p>
-<p><strong>Principal Context View</strong></p>
 <ul>
 <li><code>ctx_household</code></li>
-</ul>
-<p><strong>Dependent Context Views</strong></p>
-<ul>
 <li><code>ctx_indiv</code></li>
-<li><code>ctx_contrib</code> (<em>without</em> <code>donor_indiv_id</code>)</li>
+<li><code>ctx_contrib</code></li>
 </ul>
 
 </div>
@@ -13096,11 +13091,13 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Notebook-Setup">Notebook Setup<a class="anchor-link" href="#Notebook-Setup">&#182;</a></h2><ul>
-<li>Configure database connect information and options</li>
-<li>Clear potentially interfering context (PostgreSQL doesn't let you replace a view definition with conflicting column names)</li>
-<li>Set styling for notebook</li>
-</ul>
+<h2 id="Notebook-Setup">Notebook Setup<a class="anchor-link" href="#Notebook-Setup">&#182;</a></h2><h3 id="Configure-database-connect-info/options">Configure database connect info/options<a class="anchor-link" href="#Configure-database-connect-info/options">&#182;</a></h3><p>Note: database connect string can be specified on the initial <code>%sql</code> command:</p>
+<div class="highlight"><pre><span></span><span class="n">database_url</span> <span class="o">=</span> <span class="s2">&quot;postgresql+psycopg2://user@localhost/fecdb&quot;</span>
+<span class="o">%</span><span class="n">sql</span> <span class="err">$</span><span class="n">database_url</span>
+</pre></div>
+<p>Or, connect string is taken from DATABASE_URL environment variable (if not specified for <code>%sql</code>):</p>
+<div class="highlight"><pre><span></span><span class="o">%</span><span class="n">sql</span>
+</pre></div>
 
 </div>
 </div>
@@ -13110,12 +13107,11 @@ div#notebook {
 <div class="prompt input_prompt">In&nbsp;[1]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="n">sqlconnect</span> <span class="o">=</span> <span class="s2">&quot;postgresql+psycopg2://crash@localhost/fecdb&quot;</span>
-
-<span class="o">%</span><span class="k">load_ext</span> sql
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">load_ext</span> sql
 <span class="o">%</span><span class="k">config</span> SqlMagic.autopandas=True
 <span class="o">%</span><span class="k">config</span> InteractiveShell.ast_node_interactivity=&#39;last_expr_or_assign&#39;
-<span class="o">%</span><span class="k">sql</span> $sqlconnect
+<span class="c1"># connect string taken from DATABASE_URL environment variable</span>
+<span class="o">%</span><span class="k">sql</span>
 </pre></div>
 
     </div>
@@ -13146,99 +13142,13 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Note that we drop <em>all</em> context views so we won't have any inconsistencies after this notebook is run.  After defining <code>ctx_indiv</code> below, we will define all dependent views (see Overview, above), and leave any higher-order or orthogonal views undefined</p>
-
+<h3 id="Set-styling">Set styling<a class="anchor-link" href="#Set-styling">&#182;</a></h3>
 </div>
 </div>
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">In&nbsp;[2]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> drop view if exists ctx_contrib   cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_indiv     cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_donor     cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg_memb cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg      cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg_memb cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg      cascade
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[2]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[3]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%html</span>
@@ -13281,184 +13191,17 @@ Done.
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Create-Household-Identity">Create Household Identity<a class="anchor-link" href="#Create-Household-Identity">&#182;</a></h2><p>Let's create a Household identity for the records associated with a household that we previously queried (in <code>el_queries1.sql</code> and <code>el_queries3.sql</code>)</p>
-
+<h2 id="Validate-Context">Validate Context<a class="anchor-link" href="#Validate-Context">&#182;</a></h2>
 </div>
 </div>
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[4]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span> result &lt;&lt;
-with indiv_set as (
-    select i.*
-      from indiv i
-     where i.name like &#39;SANDELL, %&#39;
-       and i.zip_code ~ &#39;9402[58]&#39;
-)
-select set_hh_indiv(&#39;indiv&#39;, array_agg(id)) as hh_indiv_id
-  from indiv_set
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-1 rows affected.
-Returning data to local variable result
-</pre>
-</div>
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[5]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="n">hh_indiv_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[5]:</div>
-
-
-
-
-<div class="output_text output_subarea output_execute_result">
-<pre>10527363</pre>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Create-Principal-View-(ctx_household)">Create Principal View (<code>ctx_household</code>)<a class="anchor-link" href="#Create-Principal-View-(ctx_household)">&#182;</a></h2><p>Now we set the query context to be the Household identity just created</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[6]:</div>
+<div class="prompt input_prompt">In&nbsp;[3]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_household as
-select id,
-       name,
-       city,
-       state,
-       zip_code,
-       elect_cycles
-  from hh_indiv h
- where h.id = :hh_indiv_id
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[6]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Let's take a quick look at the context before proceeding.  Note: even though this record is coming from the <code>indiv</code> table, we really consider it to be coming from the <code>hh_indiv</code> view, thus in the <strong>Head of Household</strong> domain (and not the <strong>Individual</strong> domain).</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[7]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select *
+select count(*)
   from ctx_household
 </pre></div>
 
@@ -13484,7 +13227,7 @@ select *
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[7]:</div>
+    <div class="prompt output_prompt">Out[3]:</div>
 
 
 
@@ -13507,424 +13250,13 @@ select *
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>id</th>
-      <th>name</th>
-      <th>city</th>
-      <th>state</th>
-      <th>zip_code</th>
-      <th>elect_cycles</th>
+      <th>count</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>0</td>
-      <td>10527363</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004, 2006, 2008, 2010]</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Create-Dependent-Views">Create Dependent Views<a class="anchor-link" href="#Create-Dependent-Views">&#182;</a></h2><h3 id="Create-ctx_indiv">Create <code>ctx_indiv</code><a class="anchor-link" href="#Create-ctx_indiv">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[8]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_indiv as
-select i.*
-  from ctx_household hx
-  join indiv i on i.hh_indiv_id = hx.id
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[8]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[9]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select id,
-       name,
-       city,
-       state,
-       zip_code,
-       elect_cycles
-  from ctx_indiv
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-27 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[9]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>id</th>
-      <th>name</th>
-      <th>city</th>
-      <th>state</th>
-      <th>zip_code</th>
-      <th>elect_cycles</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>10527442</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2000, 2002, 2004, 2006]</td>
-    </tr>
-    <tr>
       <td>1</td>
-      <td>10527439</td>
-      <td>SANDELL, SCOTT D.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>10527446</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>10527440</td>
-      <td>SANDELL, SCOTT D.</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>10527436</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2012]</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>10527432</td>
-      <td>SANDELL, SCOTT</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>10527443</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940256940</td>
-      <td>[2004, 2006]</td>
-    </tr>
-    <tr>
-      <td>7</td>
-      <td>10527444</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>8</td>
-      <td>10527365</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>9</td>
-      <td>10527441</td>
-      <td>SANDELL, SCOTT D. MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2000, 2008, 2010, 2012]</td>
-    </tr>
-    <tr>
-      <td>10</td>
-      <td>10527434</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940256112</td>
-      <td>[2014]</td>
-    </tr>
-    <tr>
-      <td>11</td>
-      <td>10527366</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>12</td>
-      <td>10527364</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940250</td>
-      <td>[2004]</td>
-    </tr>
-    <tr>
-      <td>13</td>
-      <td>10527431</td>
-      <td>SANDELL, SCOTT</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2010, 2016]</td>
-    </tr>
-    <tr>
-      <td>14</td>
-      <td>10527438</td>
-      <td>SANDELL, SCOTT D.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2010]</td>
-    </tr>
-    <tr>
-      <td>15</td>
-      <td>10527370</td>
-      <td>SANDELL, JENNIFER AYER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004, 2010]</td>
-    </tr>
-    <tr>
-      <td>16</td>
-      <td>10527445</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>17</td>
-      <td>10527437</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>18</td>
-      <td>10527371</td>
-      <td>SANDELL, JENNIFER MS.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004]</td>
-    </tr>
-    <tr>
-      <td>19</td>
-      <td>10527368</td>
-      <td>SANDELL, JENNIFER A</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2006, 2008]</td>
-    </tr>
-    <tr>
-      <td>20</td>
-      <td>10527435</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>21</td>
-      <td>10527363</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004, 2006, 2008, 2010]</td>
-    </tr>
-    <tr>
-      <td>22</td>
-      <td>10527429</td>
-      <td>SANDELL, SCOTT</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2000, 2008, 2010, 2012, 2016]</td>
-    </tr>
-    <tr>
-      <td>23</td>
-      <td>10527369</td>
-      <td>SANDELL, JENNIFER A MS.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004]</td>
-    </tr>
-    <tr>
-      <td>24</td>
-      <td>10527430</td>
-      <td>SANDELL, SCOTT</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>25</td>
-      <td>10527447</td>
-      <td>SANDELL, SCOTT MRS.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004]</td>
-    </tr>
-    <tr>
-      <td>26</td>
-      <td>10527433</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004, 2006, 2008, 2010]</td>
     </tr>
   </tbody>
 </table>
@@ -13940,92 +13272,21 @@ select id,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Create-ctx_contrib">Create <code>ctx_contrib</code><a class="anchor-link" href="#Create-ctx_contrib">&#182;</a></h3><p>Note that we are <strong><em>not</em></strong> adding <code>donor_indiv_id</code> to this view (on top of the <code>indiv_contrib</code> columns) because we do not know that Donor records are properly identified within the <code>indiv</code> records for the context.  Thus, queries using this context view are <strong><em>not</em></strong> able to join to and/or group by the underlying Donor record.</p>
-
+<h2 id="Queries-/-Use-Cases">Queries / Use Cases<a class="anchor-link" href="#Queries-/-Use-Cases">&#182;</a></h2><h3 id="Demographic-Summary-by-State">Demographic Summary by State<a class="anchor-link" href="#Demographic-Summary-by-State">&#182;</a></h3>
 </div>
 </div>
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[10]:</div>
+<div class="prompt input_prompt">In&nbsp;[4]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_contrib as
-select ic.*
-  from ctx_indiv ix
-  join indiv_contrib ic on ic.indiv_id = ix.id
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[10]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[11]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select count(*)             as contribs,
-       sum(transaction_amt) as total_amt,
-       array_agg(distinct elect_cycle) as elect_cycles
-  from ctx_contrib
+select hx.state,
+       count(*)
+  from ctx_household hx
+ group by 1
+ order by 2 desc
 </pre></div>
 
     </div>
@@ -14050,7 +13311,7 @@ select count(*)             as contribs,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[11]:</div>
+    <div class="prompt output_prompt">Out[4]:</div>
 
 
 
@@ -14073,17 +13334,15 @@ select count(*)             as contribs,
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>contribs</th>
-      <th>total_amt</th>
-      <th>elect_cycles</th>
+      <th>state</th>
+      <th>count</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>0</td>
-      <td>101</td>
-      <td>264450.00</td>
-      <td>[2000, 2002, 2004, 2006, 2008, 2010, 2012, 201...</td>
+      <td>CA</td>
+      <td>1</td>
     </tr>
   </tbody>
 </table>
@@ -14099,25 +13358,31 @@ select count(*)             as contribs,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>As stated above, we are not able to use <code>donor_indiv_id</code> to join with <code>donor_indiv</code> (as we do in <code>dc3</code>), so the following query should result in a "<strong>column cx.donor_indiv_id does not exist</strong>" error (note: ignore any hint offered by PostgreSQL, it's well-meaning, but off-base here)</p>
+<h3 id="Top-Contributing-Households-across-Election-Cycles">Top Contributing Households across Election Cycles<a class="anchor-link" href="#Top-Contributing-Households-across-Election-Cycles">&#182;</a></h3><p>Note that we could simplify this query by introducing a <code>ctx_household_contrib</code> context view (analogous to <code>ctx_donor_contrib</code>).  <em>[It is actually a somewhat-deliberate design choice not to extend all of the Donor constructs over to Household, even though the two entities have identical underlying structures&mdash;we may complete and maintain the analogy later, if analysis and reporting by Household becomes more important and/or interesting]</em></p>
 
 </div>
 </div>
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[12]:</div>
+<div class="prompt input_prompt">In&nbsp;[5]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select d.id                 as donor_id,
-       d.name               as donor_name,
-       count(*)             as contribs,
-       sum(transaction_amt) as total_amt,
-       array_agg(distinct elect_cycle) as elect_cycles
-  from ctx_contrib cx
-  join donor_indiv d on d.id = cx.donor_indiv_id
+select hx.id as hh_id,
+       hx.name as hh_name,
+       count(*) contribs,
+       sum(ic.transaction_amt) total_amount,
+       round(avg(ic.transaction_amt), 2) avg_amount,
+       max(ic.transaction_amt) max_amount,
+       array_agg(distinct ic.elect_cycle) as elect_cycles,
+       round(sum(ic.transaction_amt) / count(distinct ic.elect_cycle), 2) avg_cycle_amount
+  from ctx_household hx
+  join indiv i on i.hh_indiv_id = hx.id
+  join indiv_contrib ic on ic.indiv_id = i.id
  group by 1, 2
+ order by 4 desc
+ limit 50
 </pre></div>
 
     </div>
@@ -14135,22 +13400,63 @@ select d.id                 as donor_id,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-(psycopg2.errors.UndefinedColumn) column cx.donor_indiv_id does not exist
-LINE 7:   join donor_indiv d on d.id = cx.donor_indiv_id
-                                       ^
-HINT:  Perhaps you meant to reference the column &#34;d.donor_indiv_id&#34;.
-
-[SQL: select d.id                 as donor_id,
-       d.name               as donor_name,
-       count(*)             as contribs,
-       sum(transaction_amt) as total_amt,
-       array_agg(distinct elect_cycle) as elect_cycles
-  from ctx_contrib cx
-  join donor_indiv d on d.id = cx.donor_indiv_id
- group by 1, 2]
-(Background on this error at: http://sqlalche.me/e/f405)
+1 rows affected.
 </pre>
 </div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[5]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>hh_id</th>
+      <th>hh_name</th>
+      <th>contribs</th>
+      <th>total_amount</th>
+      <th>avg_amount</th>
+      <th>max_amount</th>
+      <th>elect_cycles</th>
+      <th>avg_cycle_amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>10527363</td>
+      <td>SANDELL, JENNIFER</td>
+      <td>101</td>
+      <td>264450.00</td>
+      <td>2618.32</td>
+      <td>20000.00</td>
+      <td>[2000, 2002, 2004, 2006, 2008, 2010, 2012, 201...</td>
+      <td>24040.91</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
 </div>
 
 </div>

@@ -2,7 +2,7 @@
 <html>
 <head><meta charset="utf-8" />
 
-<title>dc6_ctx_dseg_total_amt_tiered_sample</title>
+<title>dc4_ctx_iseg_household</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
@@ -13077,20 +13077,18 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h1>Define Donor Segment Context &ndash; Total (Giving) Amount Tiered Sample</h1>
-<h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Explore the FEC data by specifying SQL predicates that identify <strong>Donor Segments</strong>, which are static lists of Donor (<code>donor_indiv</code> view) records.  Note that a Donor Segment context may including one <em>or more</em> segments (e.g. by name or ID).  As with Donor contexts, Donor identities <strong><em>are</em></strong> discernible within queries using this context type.</p>
-<p>For this notebook, we will create Donor Segments containing a sampling of Donors from various tiers of total contribution amounts.  We can then create a Donor Segment context based on one or more of those Donor Segments.  As a basis for the Donors comprising the Segments, we will also group the underlying Individual records into Donors using a simple name and address matching scheme.  As described below, this grouping scheme is by no means rigorous, but demonstrates an approach to bringing better integrity to some of the variability in the base FEC data sets.</p>
+<h1>Define Individual Segment Context &ndash; Household Use Case</h1>
+<h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Explore the FEC data by specifying SQL predicates that identify <strong>Individual Segments</strong>, which are static lists of Individual (<code>indiv</code> table) records.  Note that Individual Segments do not distinguish between constituent Individual records that attempt to represent either the same or different real-world people.  It is up to the definer of an Individual Segment as to the meaning of the collective membership records for a segment.  Note that an Individual Segment context may including one <em>or more</em> segments (e.g. by name or ID).  As with Individual and Household contexts, Donor identities are not discernible within queries using this context type.</p>
 <p>This approach will create the following query contexts:</p>
 <p><strong>Principal Context View</strong></p>
 <ul>
-<li><code>ctx_dseg</code></li>
+<li><code>ctx_iseg</code></li>
 </ul>
 <p><strong>Dependent Context Views</strong></p>
 <ul>
-<li><code>ctx_dseg_memb</code></li>
-<li><code>ctx_donor</code></li>
+<li><code>ctx_iseg_memb</code></li>
 <li><code>ctx_indiv</code></li>
-<li><code>ctx_contrib</code> (with <code>donor_indiv_id</code>)</li>
+<li><code>ctx_indiv_contrib</code></li>
 </ul>
 
 </div>
@@ -13099,11 +13097,13 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Notebook-Setup">Notebook Setup<a class="anchor-link" href="#Notebook-Setup">&#182;</a></h2><ul>
-<li>Configure database connect information and options</li>
-<li>Clear potentially interfering context (PostgreSQL doesn't let you replace a view definition with conflicting column names)</li>
-<li>Set styling for notebook</li>
-</ul>
+<h2 id="Notebook-Setup">Notebook Setup<a class="anchor-link" href="#Notebook-Setup">&#182;</a></h2><h3 id="Configure-database-connect-info/options">Configure database connect info/options<a class="anchor-link" href="#Configure-database-connect-info/options">&#182;</a></h3><p>Note: database connect string can be specified on the initial <code>%sql</code> command:</p>
+<div class="highlight"><pre><span></span><span class="n">database_url</span> <span class="o">=</span> <span class="s2">&quot;postgresql+psycopg2://user@localhost/fecdb&quot;</span>
+<span class="o">%</span><span class="n">sql</span> <span class="err">$</span><span class="n">database_url</span>
+</pre></div>
+<p>Or, connect string is taken from DATABASE_URL environment variable (if not specified for <code>%sql</code>):</p>
+<div class="highlight"><pre><span></span><span class="o">%</span><span class="n">sql</span>
+</pre></div>
 
 </div>
 </div>
@@ -13113,12 +13113,11 @@ div#notebook {
 <div class="prompt input_prompt">In&nbsp;[1]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="n">sqlconnect</span> <span class="o">=</span> <span class="s2">&quot;postgresql+psycopg2://crash@localhost/fecdb&quot;</span>
-
-<span class="o">%</span><span class="k">load_ext</span> sql
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">load_ext</span> sql
 <span class="o">%</span><span class="k">config</span> SqlMagic.autopandas=True
 <span class="o">%</span><span class="k">config</span> InteractiveShell.ast_node_interactivity=&#39;last_expr_or_assign&#39;
-<span class="o">%</span><span class="k">sql</span> $sqlconnect
+<span class="c1"># connect string taken from DATABASE_URL environment variable</span>
+<span class="o">%</span><span class="k">sql</span>
 </pre></div>
 
     </div>
@@ -13146,18 +13145,28 @@ div#notebook {
 </div>
 
 </div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Clear-context">Clear context<a class="anchor-link" href="#Clear-context">&#182;</a></h3><p>Note that we drop <em>all</em> context views so we won't have any inconsistencies after this notebook is run.  After defining <code>ctx_indiv</code> below, we will define all dependent views (see Overview, above), and leave any higher-order or orthogonal views undefined</p>
+
+</div>
+</div>
+</div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">In&nbsp;[2]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> drop view if exists ctx_contrib   cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_indiv     cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_donor     cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg_memb cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg      cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg_memb cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg      cascade
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg_memb     cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg          cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_donor_contrib cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_donor         cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_household     cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg_memb     cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg          cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_indiv_contrib cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_indiv         cascade
 </pre></div>
 
     </div>
@@ -13175,6 +13184,10 @@ div#notebook {
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+ * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+ * postgresql+psycopg2://crash@localhost/fecdb
 Done.
  * postgresql+psycopg2://crash@localhost/fecdb
 Done.
@@ -13231,6 +13244,13 @@ Done.
 </div>
 
 </div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Set-styling">Set styling<a class="anchor-link" href="#Set-styling">&#182;</a></h3>
+</div>
+</div>
+</div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">In&nbsp;[3]:</div>
@@ -13276,7 +13296,8 @@ Done.
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Create-Donor-Segments-(Sample-by-Total-Contribution-Since-2000)">Create Donor Segments (Sample by Total Contribution Since 2000)<a class="anchor-link" href="#Create-Donor-Segments-(Sample-by-Total-Contribution-Since-2000)">&#182;</a></h2><p>We clear out any previous versions of these temporary tables/views that are created and used in this notebook (to ensure that all of the SQL for them shown below is executed, since this use case is written for demonstration purposes).</p>
+<h2 id="Create-Individual-Segment-(for-Household)">Create Individual Segment (for Household)<a class="anchor-link" href="#Create-Individual-Segment-(for-Household)">&#182;</a></h2><p>For this use case, we are defining an Individual Segment representing a household we have previously identified.</p>
+<p>Note, we are adding the "epoch" (unixtime) suffix for uniqueness, so we don't always have to clean up between runs</p>
 
 </div>
 </div>
@@ -13286,10 +13307,11 @@ Done.
 <div class="prompt input_prompt">In&nbsp;[4]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> delete from donor_seg where name ~ &#39;^\$[0-9].*\+ donors$&#39;
-<span class="o">%</span><span class="k">sql</span> drop table if exists total_amt_seg_def       cascade
-<span class="o">%</span><span class="k">sql</span> drop materialized view if exists donor_sum   cascade
-<span class="o">%</span><span class="k">sql</span> drop materialized view if exists indiv_group cascade
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span> result &lt;&lt;
+select create_indiv_seg(array_agg(i.id), concat(&#39;Sandell 9402x Household - &#39;, round(extract(epoch from now()))))
+  from indiv i
+ where i.name like &#39;SANDELL, %&#39;
+   and i.zip_code ~ &#39;9402[58]&#39;
 </pre></div>
 
     </div>
@@ -13307,83 +13329,22 @@ Done.
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-15 rows affected.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
+1 rows affected.
+Returning data to local variable result
 </pre>
 </div>
 </div>
 
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[4]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
 </div>
 </div>
 
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>This view is a rough cut approach to grouping <code>indiv</code> records that are likely to represent the same real-wold person.  Individuals here are grouped together if matching on the combination of: last name, first three characters of first name, and first three characters of zip code.  Note that this view only considers the most standard pattern of name representation in the FEC data (i.e "&lt;last&gt;, &lt;first&gt; [&lt;middle&gt;|&lt;titles&gt;|&lt;degrees&gt;|...]"); other non-well-formed representations will be skipped (or not properly parsed and associated).</p>
-<p>This quick and dirty logic is used for creating Donors from Individuals in this notebook (for demonstration purposes), but should be replaced later by higher-definition, context-sensitive algorithms when trying to get more accurate analysis and reporting out of the data.</p>
-
-</div>
-</div>
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">In&nbsp;[5]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create materialized view indiv_group as
-select ip.part1                  as last_name,
-       substr(ip.part2, 1, 3)    as first_name_pfx,
-       substr(ip.zip_code, 1, 3) as zip_pfx,
-       count(distinct ip.id)     as indivs,
-       array_agg(distinct ip.id) as indiv_ids
-  from indiv_parsed ip
- where ip.name ~ &#39;^[A-Z][^,]&#39;
-   and ip.zip_code is not null
-   and ip.num_parts &gt; 1
-   and ip.part1 !~ &#39; &#39;
- group by 1, 2, 3
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">indiv_seg_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
 </pre></div>
 
     </div>
@@ -13393,18 +13354,6 @@ select ip.part1                  as last_name,
 <div class="output_wrapper">
 <div class="output">
 
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-6738578 rows affected.
-</pre>
-</div>
-</div>
 
 <div class="output_area">
 
@@ -13412,31 +13361,9 @@ select ip.part1                  as last_name,
 
 
 
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
 
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
+<div class="output_text output_subarea output_execute_result">
+<pre>9</pre>
 </div>
 
 </div>
@@ -13448,8 +13375,7 @@ select ip.part1                  as last_name,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Now create a view summarizing the contributions of the Individual groupings (i.e. the approximation of Donors) created above.  The aggregation for each "Donor" includes the list of consolidated <code>indiv_id</code> keys, the total number of contributions, and the total and average amounts.</p>
-<p>SQL design note: not obvious whether it is better to re-aggregate the unnested ids (even though we are not able to omit the <code>distinct</code> qualifier), or select <code>ig.indiv_ids</code> and add to GROUP BY clause&mdash;voting for the former option right now...</p>
+<h2 id="Create-Principal-View-(ctx_iseg)">Create Principal View (<code>ctx_iseg</code>)<a class="anchor-link" href="#Create-Principal-View-(ctx_iseg)">&#182;</a></h2><p>The context will represent only the single segment, just defined.  Queries written against this context will also work for multi-segment contexts.</p>
 
 </div>
 </div>
@@ -13460,27 +13386,12 @@ select ip.part1                  as last_name,
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create materialized view donor_sum as
-with indiv_group_memb as (
-    select ig.last_name,
-           ig.first_name_pfx,
-           ig.zip_pfx,
-           --ig.indiv_ids,
-           unnest(ig.indiv_ids) as indiv_id
-      from indiv_group ig
-)
-select igm.last_name,
-       igm.first_name_pfx,
-       igm.zip_pfx,
-       array_agg(distinct igm.indiv_id)
-                                 as indiv_ids,
-       count(ic.transaction_amt) as contribs,
-       sum(ic.transaction_amt)   as total_amt,
-       round(sum(ic.transaction_amt) / count(ic.transaction_amt), 2)
-                                 as avg_amt
-  from indiv_group_memb igm
-  join indiv_contrib ic on ic.indiv_id = igm.indiv_id
- group by 1, 2, 3
+create or replace view ctx_iseg as
+select id,
+       name,
+       description
+  from indiv_seg isg
+ where isg.id = :indiv_seg_id
 </pre></div>
 
     </div>
@@ -13498,7 +13409,7 @@ select igm.last_name,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-6738578 rows affected.
+Done.
 </pre>
 </div>
 </div>
@@ -13542,21 +13453,14 @@ select igm.last_name,
 </div>
 
 </div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Create a couple of indexes for performance.</p>
-
-</div>
-</div>
-</div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">In&nbsp;[7]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> create index donor_sum_total_amt on donor_sum (total_amt)
-<span class="o">%</span><span class="k">sql</span> create index donor_sum_avg_amt on donor_sum (avg_amt)
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select *
+  from ctx_iseg
 </pre></div>
 
     </div>
@@ -13574,9 +13478,7 @@ select igm.last_name,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
+1 rows affected.
 </pre>
 </div>
 </div>
@@ -13606,9 +13508,18 @@ Done.
   <thead>
     <tr style="text-align: right;">
       <th></th>
+      <th>id</th>
+      <th>name</th>
+      <th>description</th>
     </tr>
   </thead>
   <tbody>
+    <tr>
+      <td>0</td>
+      <td>9</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>None</td>
+    </tr>
   </tbody>
 </table>
 </div>
@@ -13623,8 +13534,7 @@ Done.
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>We need to record the total number of "Donor" records, total number of contributions, and total contribution amount in <code>donor_sum</code> for the cumulative stats below.</p>
-
+<h2 id="Create-Dependent-Views">Create Dependent Views<a class="anchor-link" href="#Create-Dependent-Views">&#182;</a></h2><h3 id="Create-ctx_iseg_memb">Create <code>ctx_iseg_memb</code><a class="anchor-link" href="#Create-ctx_iseg_memb">&#182;</a></h3>
 </div>
 </div>
 </div>
@@ -13633,11 +13543,11 @@ Done.
 <div class="prompt input_prompt">In&nbsp;[8]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span> result &lt;&lt;
-select count(*)       as num_donors,
-       sum(contribs)  as sum_contribs,
-       sum(total_amt) as sum_total_amt
-  from donor_sum
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+create or replace view ctx_iseg_memb as
+select ism.*
+  from ctx_iseg isx
+  join indiv_seg_memb ism on ism.indiv_seg_id = isx.id
 </pre></div>
 
     </div>
@@ -13655,10 +13565,44 @@ select count(*)       as num_donors,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-1 rows affected.
-Returning data to local variable result
+Done.
 </pre>
 </div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[8]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+</div>
+</div>
+
 </div>
 
 </div>
@@ -13670,54 +13614,16 @@ Returning data to local variable result
 <div class="prompt input_prompt">In&nbsp;[9]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="p">(</span><span class="n">num_donors</span><span class="p">,</span> <span class="n">sum_contribs</span><span class="p">,</span> <span class="n">sum_total_amt</span><span class="p">)</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-<span class="c1"># cast from numpy.int64, where needed</span>
-<span class="n">num_donors</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_donors</span><span class="p">)</span>
-<span class="n">sum_contribs</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">sum_contribs</span><span class="p">)</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[9]:</div>
-
-
-
-
-<div class="output_text output_subarea output_execute_result">
-<pre>61967790</pre>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Let's format the results for easier inspection.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[10]:</div>
-<div class="inner_cell">
-    <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select to_char(:num_donors,    &#39;999,999,999&#39;)        as num_donors,
-       to_char(:sum_contribs,  &#39;999,999,999&#39;)        as sum_contribs,
-       to_char(:sum_total_amt, &#39;999,999,999,999.99&#39;) as sum_total_amt
+select isg.name as iseg_name,
+       i.name   as indiv_name,
+       i.city,
+       i.state,
+       i.zip_code,
+       i.elect_cycles
+  from ctx_iseg_memb ismx
+  join indiv_seg isg on isg.id = ismx.indiv_seg_id
+  join indiv i on i.id = ismx.indiv_id
 </pre></div>
 
     </div>
@@ -13735,7 +13641,334 @@ select to_char(:num_donors,    &#39;999,999,999&#39;)        as num_donors,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-1 rows affected.
+27 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[9]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>iseg_name</th>
+      <th>indiv_name</th>
+      <th>city</th>
+      <th>state</th>
+      <th>zip_code</th>
+      <th>elect_cycles</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, JENNIFER</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004, 2006, 2008, 2010]</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, JENNIFER</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940250</td>
+      <td>[2004]</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, JENNIFER</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>94028</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, JENNIFER</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>940287608</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, JENNIFER A</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2006, 2008]</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, JENNIFER A MS.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004]</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, JENNIFER AYER</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004, 2010]</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, JENNIFER MS.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004]</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2000, 2008, 2010, 2012, 2016]</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940257022</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>94028</td>
+      <td>[2010, 2016]</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>940287608</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT D</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004, 2006, 2008, 2010]</td>
+    </tr>
+    <tr>
+      <td>13</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT D</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940256112</td>
+      <td>[2014]</td>
+    </tr>
+    <tr>
+      <td>14</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT D</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940257022</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>15</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT D</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>94028</td>
+      <td>[2012]</td>
+    </tr>
+    <tr>
+      <td>16</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT D</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>940287608</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>17</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT D.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2010]</td>
+    </tr>
+    <tr>
+      <td>18</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT D.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940257022</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>19</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT D.</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>94028</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>20</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT D. MR.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2000, 2008, 2010, 2012]</td>
+    </tr>
+    <tr>
+      <td>21</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT MR.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2000, 2002, 2004, 2006]</td>
+    </tr>
+    <tr>
+      <td>22</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT MR.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940256940</td>
+      <td>[2004, 2006]</td>
+    </tr>
+    <tr>
+      <td>23</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT MR.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940257022</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>24</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT MR.</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>94028</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>25</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT MR.</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>940287608</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>26</td>
+      <td>Sandell 9402x Household - 1568739355</td>
+      <td>SANDELL, SCOTT MRS.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004]</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Create-ctx_indiv">Create <code>ctx_indiv</code><a class="anchor-link" href="#Create-ctx_indiv">&#182;</a></h3>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[10]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+create or replace view ctx_indiv as
+select i.*
+  from ctx_iseg_memb ismx
+  join indiv i on i.id = ismx.indiv_id
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+Done.
 </pre>
 </div>
 </div>
@@ -13765,18 +13998,9 @@ select to_char(:num_donors,    &#39;999,999,999&#39;)        as num_donors,
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>num_donors</th>
-      <th>sum_contribs</th>
-      <th>sum_total_amt</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>0</td>
-      <td>6,738,578</td>
-      <td>61,967,790</td>
-      <td>27,462,347,087.00</td>
-    </tr>
   </tbody>
 </table>
 </div>
@@ -13788,23 +14012,19 @@ select to_char(:num_donors,    &#39;999,999,999&#39;)        as num_donors,
 </div>
 
 </div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Note that the previous totals only consider the contributions tied to the Individuals included in <code>donor_sum</code>.  For perspective, we'll show to percentages of those relative to all contributions in <code>indiv_contrib</code>.</p>
-
-</div>
-</div>
-</div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">In&nbsp;[11]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select round(round(:sum_contribs, 0) / count(*) * 100.0, 2)    as pct_contribs,
-       round(:sum_total_amt / sum(transaction_amt) * 100.0, 2) as pct_total_amt
-  from indiv_contrib
+select id,
+       name,
+       city,
+       state,
+       zip_code,
+       elect_cycles
+  from ctx_indiv
 </pre></div>
 
     </div>
@@ -13822,7 +14042,7 @@ select round(round(:sum_contribs, 0) / count(*) * 100.0, 2)    as pct_contribs,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-1 rows affected.
+27 rows affected.
 </pre>
 </div>
 </div>
@@ -13852,15 +14072,257 @@ select round(round(:sum_contribs, 0) / count(*) * 100.0, 2)    as pct_contribs,
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>pct_contribs</th>
-      <th>pct_total_amt</th>
+      <th>id</th>
+      <th>name</th>
+      <th>city</th>
+      <th>state</th>
+      <th>zip_code</th>
+      <th>elect_cycles</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>0</td>
-      <td>97.81</td>
-      <td>87.50</td>
+      <td>10527363</td>
+      <td>SANDELL, JENNIFER</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004, 2006, 2008, 2010]</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>10527364</td>
+      <td>SANDELL, JENNIFER</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940250</td>
+      <td>[2004]</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>10527365</td>
+      <td>SANDELL, JENNIFER</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>94028</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>10527366</td>
+      <td>SANDELL, JENNIFER</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>940287608</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>10527368</td>
+      <td>SANDELL, JENNIFER A</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2006, 2008]</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>10527369</td>
+      <td>SANDELL, JENNIFER A MS.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004]</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>10527370</td>
+      <td>SANDELL, JENNIFER AYER</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004, 2010]</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>10527371</td>
+      <td>SANDELL, JENNIFER MS.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004]</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>10527429</td>
+      <td>SANDELL, SCOTT</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2000, 2008, 2010, 2012, 2016]</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>10527430</td>
+      <td>SANDELL, SCOTT</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940257022</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>10527431</td>
+      <td>SANDELL, SCOTT</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>94028</td>
+      <td>[2010, 2016]</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>10527432</td>
+      <td>SANDELL, SCOTT</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>940287608</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>10527433</td>
+      <td>SANDELL, SCOTT D</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004, 2006, 2008, 2010]</td>
+    </tr>
+    <tr>
+      <td>13</td>
+      <td>10527434</td>
+      <td>SANDELL, SCOTT D</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940256112</td>
+      <td>[2014]</td>
+    </tr>
+    <tr>
+      <td>14</td>
+      <td>10527435</td>
+      <td>SANDELL, SCOTT D</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940257022</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>15</td>
+      <td>10527436</td>
+      <td>SANDELL, SCOTT D</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>94028</td>
+      <td>[2012]</td>
+    </tr>
+    <tr>
+      <td>16</td>
+      <td>10527437</td>
+      <td>SANDELL, SCOTT D</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>940287608</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>17</td>
+      <td>10527438</td>
+      <td>SANDELL, SCOTT D.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2010]</td>
+    </tr>
+    <tr>
+      <td>18</td>
+      <td>10527439</td>
+      <td>SANDELL, SCOTT D.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940257022</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>19</td>
+      <td>10527440</td>
+      <td>SANDELL, SCOTT D.</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>94028</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>20</td>
+      <td>10527441</td>
+      <td>SANDELL, SCOTT D. MR.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2000, 2008, 2010, 2012]</td>
+    </tr>
+    <tr>
+      <td>21</td>
+      <td>10527442</td>
+      <td>SANDELL, SCOTT MR.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2000, 2002, 2004, 2006]</td>
+    </tr>
+    <tr>
+      <td>22</td>
+      <td>10527443</td>
+      <td>SANDELL, SCOTT MR.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940256940</td>
+      <td>[2004, 2006]</td>
+    </tr>
+    <tr>
+      <td>23</td>
+      <td>10527444</td>
+      <td>SANDELL, SCOTT MR.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940257022</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>24</td>
+      <td>10527445</td>
+      <td>SANDELL, SCOTT MR.</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>94028</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>25</td>
+      <td>10527446</td>
+      <td>SANDELL, SCOTT MR.</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>940287608</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>26</td>
+      <td>10527447</td>
+      <td>SANDELL, SCOTT MRS.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004]</td>
     </tr>
   </tbody>
 </table>
@@ -13876,8 +14338,7 @@ select round(round(:sum_contribs, 0) / count(*) * 100.0, 2)    as pct_contribs,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Enumerate the cutoff amounts (for total contributions) that define the boundaries between the segments to create.</p>
-
+<h3 id="Create-ctx_indiv_contrib">Create <code>ctx_indiv_contrib</code><a class="anchor-link" href="#Create-ctx_indiv_contrib">&#182;</a></h3>
 </div>
 </div>
 </div>
@@ -13887,22 +14348,10 @@ select round(round(:sum_contribs, 0) / count(*) * 100.0, 2)    as pct_contribs,
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create temporary table total_amt_seg_def as
-select unnest(array[100000000,
-                    50000000,
-                    10000000,
-                    5000000,
-                    1000000,
-                    500000,
-                    100000,
-                    50000,
-                    10000,
-                    5000,
-                    2500,
-                    1000,
-                    500,
-                    250,
-                    0]) as seg_amt
+create or replace view ctx_indiv_contrib as
+select ic.*
+  from ctx_indiv ix
+  join indiv_contrib ic on ic.indiv_id = ix.id
 </pre></div>
 
     </div>
@@ -13920,7 +14369,7 @@ select unnest(array[100000000,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-15 rows affected.
+Done.
 </pre>
 </div>
 </div>
@@ -13964,1846 +14413,16 @@ select unnest(array[100000000,
 </div>
 
 </div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>For fun, let's take a look at the number of Donor who have given above each of the threshold amounts we just defined, as well as the percentage of Donors they represent, and a percentage of contribution amount they have given.  Note the percentages are relative to the membership of the <code>donor_sum</code> view (and not all contributions), as stated above.</p>
-
-</div>
-</div>
-</div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">In&nbsp;[13]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select seg_def.seg_amt,
-       seg_stat.donors,
-       round(seg_stat.donors::numeric / :num_donors * 100, 2) as pct_donors,
-       seg_stat.total_amt,
-       round(seg_stat.total_amt / :sum_total_amt * 100, 1) as pct_total_amt
-  from total_amt_seg_def seg_def
-  join lateral
-       (select count(*)          as donors,
-               sum(ds.total_amt) as total_amt
-          from donor_sum ds
-         where ds.total_amt &gt; seg_def.seg_amt) as seg_stat on true
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-15 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[13]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>seg_amt</th>
-      <th>donors</th>
-      <th>pct_donors</th>
-      <th>total_amt</th>
-      <th>pct_total_amt</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>100000000</td>
-      <td>4</td>
-      <td>0.00</td>
-      <td>732484158.00</td>
-      <td>2.7</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>50000000</td>
-      <td>10</td>
-      <td>0.00</td>
-      <td>1140215466.00</td>
-      <td>4.2</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>10000000</td>
-      <td>63</td>
-      <td>0.00</td>
-      <td>2174445937.00</td>
-      <td>7.9</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>5000000</td>
-      <td>152</td>
-      <td>0.00</td>
-      <td>2788096190.00</td>
-      <td>10.2</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>1000000</td>
-      <td>1272</td>
-      <td>0.02</td>
-      <td>4790581969.00</td>
-      <td>17.4</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>500000</td>
-      <td>3413</td>
-      <td>0.05</td>
-      <td>6239104750.00</td>
-      <td>22.7</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>100000</td>
-      <td>27132</td>
-      <td>0.40</td>
-      <td>10847056859.00</td>
-      <td>39.5</td>
-    </tr>
-    <tr>
-      <td>7</td>
-      <td>50000</td>
-      <td>61836</td>
-      <td>0.92</td>
-      <td>13240248957.00</td>
-      <td>48.2</td>
-    </tr>
-    <tr>
-      <td>8</td>
-      <td>10000</td>
-      <td>364585</td>
-      <td>5.41</td>
-      <td>19338501071.00</td>
-      <td>70.4</td>
-    </tr>
-    <tr>
-      <td>9</td>
-      <td>5000</td>
-      <td>713220</td>
-      <td>10.58</td>
-      <td>21794567888.00</td>
-      <td>79.4</td>
-    </tr>
-    <tr>
-      <td>10</td>
-      <td>2500</td>
-      <td>1284370</td>
-      <td>19.06</td>
-      <td>23841389134.00</td>
-      <td>86.8</td>
-    </tr>
-    <tr>
-      <td>11</td>
-      <td>1000</td>
-      <td>2347970</td>
-      <td>34.84</td>
-      <td>25671334310.00</td>
-      <td>93.5</td>
-    </tr>
-    <tr>
-      <td>12</td>
-      <td>500</td>
-      <td>3449425</td>
-      <td>51.19</td>
-      <td>26584092125.00</td>
-      <td>96.8</td>
-    </tr>
-    <tr>
-      <td>13</td>
-      <td>250</td>
-      <td>4770045</td>
-      <td>70.79</td>
-      <td>27140980157.00</td>
-      <td>98.8</td>
-    </tr>
-    <tr>
-      <td>14</td>
-      <td>0</td>
-      <td>6616489</td>
-      <td>98.19</td>
-      <td>27468139681.00</td>
-      <td>100.0</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Here are a couple functions that will help us create the Donor Segments representing banded giving amounts.</p>
-<p>First, a utility function to aid in creating friendlier segments names.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[14]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-CREATE OR REPLACE FUNCTION human_readable(label TEXT) RETURNS TEXT AS $$
-    SELECT regexp_replace(
-               regexp_replace(
-                   regexp_replace(
-                       label,
-                       &#39;0{9}([^0-9]|$)&#39;, &#39;B\1&#39;),
-                   &#39;0{6}([^0-9]|$)&#39;, &#39;M\1&#39;),
-               &#39;0{3}([^0-9]|$)&#39;, &#39;K\1&#39;);
-$$ LANGUAGE SQL
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[14]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Next, the workhorse function that creates a Donor Segment based on a total giving band (i.e. greater than the specified amount, but less than the next higher threshold), and adds appropriate sample Donors as members.  Note that the underlying <code>create_donor_seg</code> function does the work of connecting the <code>indiv_ids</code> records to the base Donor (<code>donor_contrib</code>) record.</p>
-<p>Note that this does not really choose a good representative sample within the giving band, it actually just chooses the first <code>seg_size</code> records above the threshold amount, and for the case of the top several bands (where the actual membership is less than <code>seg_size</code>), it includes members in segments representing higher amounts.  We can fix these things with a little more effort [<em>psst, EL, let me know</em>].</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[15]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-CREATE OR REPLACE FUNCTION create_donor_seg_by_amt(seg_amt NUMERIC, seg_size INTEGER = 100)
-RETURNS TABLE(seg_id BIGINT, seg_name TEXT) AS $$
-
-DECLARE
-sql      TEXT;
-seg_name TEXT;
-seg_desc TEXT = NULL;
-BEGIN
-    sql = format(&#39;select human_readable(concat(%L, $1, %L))&#39;, &#39;$&#39;, &#39;+ donors&#39;);
-    EXECUTE sql INTO seg_name USING seg_amt;
-
-    sql = &#39;with donor_set as (
-               select row(ds.indiv_ids)::id_array as ids
-                 from donor_sum ds
-                where ds.total_amt &gt; $2
-                order by ds.total_amt asc
-                limit ($3)
-           )
-           select create_donor_seg(array_agg(ids), $1),
-                  $1
-             from donor_set
-            group by 2&#39;;
-    RETURN QUERY EXECUTE sql USING seg_name, seg_amt, seg_size;
-END;
-$$ LANGUAGE plpgsql
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[15]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Now we create Donor Segments for 200 sample records within each segment (with the qualifications on quality of representation given above).  The output lists the segments just created.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[16]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select seg_def.seg_amt, (create_donor_seg_by_amt(seg_def.seg_amt, 200)).*
-  from total_amt_seg_def seg_def
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-15 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[16]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>seg_amt</th>
-      <th>seg_id</th>
-      <th>seg_name</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>100000000</td>
-      <td>144</td>
-      <td>$100M+ donors</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>50000000</td>
-      <td>145</td>
-      <td>$50M+ donors</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>10000000</td>
-      <td>146</td>
-      <td>$10M+ donors</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>5000000</td>
-      <td>147</td>
-      <td>$5M+ donors</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>1000000</td>
-      <td>148</td>
-      <td>$1M+ donors</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>500000</td>
-      <td>149</td>
-      <td>$500K+ donors</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>100000</td>
-      <td>150</td>
-      <td>$100K+ donors</td>
-    </tr>
-    <tr>
-      <td>7</td>
-      <td>50000</td>
-      <td>151</td>
-      <td>$50K+ donors</td>
-    </tr>
-    <tr>
-      <td>8</td>
-      <td>10000</td>
-      <td>152</td>
-      <td>$10K+ donors</td>
-    </tr>
-    <tr>
-      <td>9</td>
-      <td>5000</td>
-      <td>153</td>
-      <td>$5K+ donors</td>
-    </tr>
-    <tr>
-      <td>10</td>
-      <td>2500</td>
-      <td>154</td>
-      <td>$2500+ donors</td>
-    </tr>
-    <tr>
-      <td>11</td>
-      <td>1000</td>
-      <td>155</td>
-      <td>$1K+ donors</td>
-    </tr>
-    <tr>
-      <td>12</td>
-      <td>500</td>
-      <td>156</td>
-      <td>$500+ donors</td>
-    </tr>
-    <tr>
-      <td>13</td>
-      <td>250</td>
-      <td>157</td>
-      <td>$250+ donors</td>
-    </tr>
-    <tr>
-      <td>14</td>
-      <td>0</td>
-      <td>158</td>
-      <td>$0+ donors</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Now show the number of members in each of the segments.  Note that the segments with less then the <code>seg_size</code> specified above (and possibly the first one listed with <code>seg_size</code> members) may represent multiple inclusions (other than the segment representing the top amount).</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[17]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select ds.id    as seg_id,
-       ds.name  as seg_name,
-       count(*) as seg_members
-  from donor_seg ds
-  join donor_seg_memb dsm on dsm.donor_seg_id = ds.id
- where ds.name ~ &#39;^\$[0-9].*\+ donors$&#39;
- group by 1, 2
- order by 1
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-15 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[17]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>seg_id</th>
-      <th>seg_name</th>
-      <th>seg_members</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>144</td>
-      <td>$100M+ donors</td>
-      <td>4</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>145</td>
-      <td>$50M+ donors</td>
-      <td>10</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>146</td>
-      <td>$10M+ donors</td>
-      <td>63</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>147</td>
-      <td>$5M+ donors</td>
-      <td>152</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>148</td>
-      <td>$1M+ donors</td>
-      <td>200</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>149</td>
-      <td>$500K+ donors</td>
-      <td>200</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>150</td>
-      <td>$100K+ donors</td>
-      <td>200</td>
-    </tr>
-    <tr>
-      <td>7</td>
-      <td>151</td>
-      <td>$50K+ donors</td>
-      <td>200</td>
-    </tr>
-    <tr>
-      <td>8</td>
-      <td>152</td>
-      <td>$10K+ donors</td>
-      <td>200</td>
-    </tr>
-    <tr>
-      <td>9</td>
-      <td>153</td>
-      <td>$5K+ donors</td>
-      <td>200</td>
-    </tr>
-    <tr>
-      <td>10</td>
-      <td>154</td>
-      <td>$2500+ donors</td>
-      <td>200</td>
-    </tr>
-    <tr>
-      <td>11</td>
-      <td>155</td>
-      <td>$1K+ donors</td>
-      <td>200</td>
-    </tr>
-    <tr>
-      <td>12</td>
-      <td>156</td>
-      <td>$500+ donors</td>
-      <td>200</td>
-    </tr>
-    <tr>
-      <td>13</td>
-      <td>157</td>
-      <td>$250+ donors</td>
-      <td>200</td>
-    </tr>
-    <tr>
-      <td>14</td>
-      <td>158</td>
-      <td>$0+ donors</td>
-      <td>200</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Create-Context-Views">Create Context Views<a class="anchor-link" href="#Create-Context-Views">&#182;</a></h2><h3 id="Create-ctx_dseg">Create <code>ctx_dseg</code><a class="anchor-link" href="#Create-ctx_dseg">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[18]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_dseg as
-select id,
-       name,
-       description
-  from donor_seg ds
- where ds.name in (&#39;$100M+ donors&#39;, &#39;$50M+ donors&#39;, &#39;$10M+ donors&#39;)
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[18]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Validate the Segments included in the context.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[19]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select *
-  from ctx_dseg
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-3 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[19]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>id</th>
-      <th>name</th>
-      <th>description</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>144</td>
-      <td>$100M+ donors</td>
-      <td>None</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>145</td>
-      <td>$50M+ donors</td>
-      <td>None</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>146</td>
-      <td>$10M+ donors</td>
-      <td>None</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Create-ctx_dseg_memb">Create <code>ctx_dseg_memb</code><a class="anchor-link" href="#Create-ctx_dseg_memb">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[20]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_dseg_memb as
-select dsm.*
-  from ctx_dseg dsx
-  join donor_seg_memb dsm on dsm.donor_seg_id = dsx.id
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[20]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Taking a look at the Donor Segment Members, we may see some repetition of Donors who were inadvertently added as members of multiple Donor Segments.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[21]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select ds.id   as dseg_id,
-       ds.name as dseg_name,
-       d.id    as memb_donor_id,
-       d.name  as memb_donor_name,
-       d.city,
-       d.state,
-       d.zip_code
-  from ctx_dseg_memb dsmx
-  join donor_seg ds on ds.id = dsmx.donor_seg_id
-  join donor_indiv d on d.id = dsmx.donor_indiv_id
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-77 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[21]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>dseg_id</th>
-      <th>dseg_name</th>
-      <th>memb_donor_id</th>
-      <th>memb_donor_name</th>
-      <th>city</th>
-      <th>state</th>
-      <th>zip_code</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>144</td>
-      <td>$100M+ donors</td>
-      <td>70692</td>
-      <td>ADELSON, MIRIAM</td>
-      <td>LAS VEAGS</td>
-      <td>NV</td>
-      <td>89109</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>144</td>
-      <td>$100M+ donors</td>
-      <td>1076630</td>
-      <td>BLOOMBERG, MICHAEL</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>10021</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>144</td>
-      <td>$100M+ donors</td>
-      <td>70790</td>
-      <td>ADELSON, SHELDON</td>
-      <td>LAS VEGAS</td>
-      <td>NV</td>
-      <td>89109</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>144</td>
-      <td>$100M+ donors</td>
-      <td>11612429</td>
-      <td>STEYER, THOMAS</td>
-      <td>SAN FRANCISCO</td>
-      <td>CA</td>
-      <td>94104</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>145</td>
-      <td>$50M+ donors</td>
-      <td>11141923</td>
-      <td>SINGER, PAUL</td>
-      <td>NEW YOR</td>
-      <td>NY</td>
-      <td>10024</td>
-    </tr>
-    <tr>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-    </tr>
-    <tr>
-      <td>72</td>
-      <td>146</td>
-      <td>$10M+ donors</td>
-      <td>3535137</td>
-      <td>EYCHANER, FRED</td>
-      <td>CHICAGO</td>
-      <td>IL</td>
-      <td>60614</td>
-    </tr>
-    <tr>
-      <td>73</td>
-      <td>146</td>
-      <td>$10M+ donors</td>
-      <td>70692</td>
-      <td>ADELSON, MIRIAM</td>
-      <td>LAS VEAGS</td>
-      <td>NV</td>
-      <td>89109</td>
-    </tr>
-    <tr>
-      <td>74</td>
-      <td>146</td>
-      <td>$10M+ donors</td>
-      <td>1076630</td>
-      <td>BLOOMBERG, MICHAEL</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>10021</td>
-    </tr>
-    <tr>
-      <td>75</td>
-      <td>146</td>
-      <td>$10M+ donors</td>
-      <td>70790</td>
-      <td>ADELSON, SHELDON</td>
-      <td>LAS VEGAS</td>
-      <td>NV</td>
-      <td>89109</td>
-    </tr>
-    <tr>
-      <td>76</td>
-      <td>146</td>
-      <td>$10M+ donors</td>
-      <td>11612429</td>
-      <td>STEYER, THOMAS</td>
-      <td>SAN FRANCISCO</td>
-      <td>CA</td>
-      <td>94104</td>
-    </tr>
-  </tbody>
-</table>
-<p>77 rows × 7 columns</p>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Create-ctx_donor">Create <code>ctx_donor</code><a class="anchor-link" href="#Create-ctx_donor">&#182;</a></h3><p>We actually have to guard againt multiple inclusions of a Donor (member of overlapping Donor Segments), as highlighted by the caveat given above in the creation of the Donor Segments.  If there are a significantly large number of Donor records represented in the context, then we may want to create this as a materialized view, so that the DISTINCT operation isn't performed for every query based on <code>ctx_donor</code>.</p>
-<p>Note that if there is no chance of multiple inclusion (e.g. if <code>ctx_dseg</code> does not include more than one Donor Segments), then <code>ctx_donor</code> can be created more simply (and more performantly...if that's a word) as:</p>
-<div class="highlight"><pre><span></span><span class="k">create</span> <span class="k">or</span> <span class="k">replace</span> <span class="k">view</span> <span class="n">ctx_donor</span> <span class="k">as</span>
-<span class="k">select</span> <span class="n">d</span><span class="p">.</span><span class="o">*</span>
-  <span class="k">from</span> <span class="n">ctx_dseg_memb</span> <span class="n">dsmx</span>
-  <span class="k">join</span> <span class="n">donor_indiv</span> <span class="n">d</span> <span class="k">on</span> <span class="n">d</span><span class="p">.</span><span class="n">id</span> <span class="o">=</span> <span class="n">dsmx</span><span class="p">.</span><span class="n">donor_indiv_id</span>
-</pre></div>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[22]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_donor as
-with ctx_dseg_donor as (
-    select distinct dsmx.donor_indiv_id
-      from ctx_dseg_memb dsmx
-)
-select d.*
-  from ctx_dseg_donor dsdx
-  join donor_indiv d on d.id = dsdx.donor_indiv_id
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[22]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Note that the number of Donor records in the context is less than the number of Donor Segment Members, since the latter count represented multiple inclusions of <code>donor_indiv</code> records.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[23]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select id,
-       name,
-       city,
-       state,
-       zip_code,
-       elect_cycles
-  from ctx_donor
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-63 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[23]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>id</th>
-      <th>name</th>
-      <th>city</th>
-      <th>state</th>
-      <th>zip_code</th>
-      <th>elect_cycles</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>13175315</td>
-      <td>WOODS, LAURE</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940287343</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>3535137</td>
-      <td>EYCHANER, FRED</td>
-      <td>CHICAGO</td>
-      <td>IL</td>
-      <td>60614</td>
-      <td>[2000, 2002, 2004, 2006, 2008, 2010, 2012, 201...</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>11141923</td>
-      <td>SINGER, PAUL</td>
-      <td>NEW YOR</td>
-      <td>NY</td>
-      <td>10024</td>
-      <td>[2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>12215200</td>
-      <td>TRUMP, DONALD</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>10022</td>
-      <td>[2000, 2002, 2004, 2006, 2008, 2010, 2012, 2014]</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>5205673</td>
-      <td>HENDRICKS, DIANE</td>
-      <td>AFTON</td>
-      <td>WI</td>
-      <td>53501</td>
-      <td>[2008, 2010, 2012, 2018]</td>
-    </tr>
-    <tr>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-    </tr>
-    <tr>
-      <td>58</td>
-      <td>10047670</td>
-      <td>RICKETTS, MARGARET</td>
-      <td>OMAHA</td>
-      <td>NE</td>
-      <td>681122311</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>59</td>
-      <td>2802689</td>
-      <td>DEASON, DARWIN</td>
-      <td>DALLAS</td>
-      <td>TX</td>
-      <td>75204</td>
-      <td>[2000, 2014]</td>
-    </tr>
-    <tr>
-      <td>60</td>
-      <td>5643646</td>
-      <td>HUMPHREYS, DAVID</td>
-      <td>JOPLIN</td>
-      <td>MO</td>
-      <td>64801</td>
-      <td>[2004, 2018]</td>
-    </tr>
-    <tr>
-      <td>61</td>
-      <td>948855</td>
-      <td>BEZOS, JEFF</td>
-      <td>SEATTLE</td>
-      <td>WA</td>
-      <td>981246614</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>62</td>
-      <td>8080147</td>
-      <td>MERCER, ROBERT</td>
-      <td>EAST SETAUCKET</td>
-      <td>NY</td>
-      <td>11733</td>
-      <td>[2014]</td>
-    </tr>
-  </tbody>
-</table>
-<p>63 rows × 6 columns</p>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Create-ctx_indiv">Create <code>ctx_indiv</code><a class="anchor-link" href="#Create-ctx_indiv">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[24]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_indiv as
-select i.*
-  from ctx_donor dx
-  join indiv i on i.donor_indiv_id = dx.id
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[24]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[25]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select id,
-       name,
-       city,
-       state,
-       zip_code,
-       elect_cycles,
-       donor_indiv_id
-  from ctx_indiv
- order by donor_indiv_id, name
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-1433 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[25]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>id</th>
-      <th>name</th>
-      <th>city</th>
-      <th>state</th>
-      <th>zip_code</th>
-      <th>elect_cycles</th>
-      <th>donor_indiv_id</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>21800</td>
-      <td>ABRAHAM, DANIEL</td>
-      <td>WEST PALM BEACH</td>
-      <td>FL</td>
-      <td>334016152</td>
-      <td>[2016]</td>
-      <td>21795</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>21795</td>
-      <td>ABRAHAM, DANIEL</td>
-      <td>PALM BEACH</td>
-      <td>FL</td>
-      <td>33480</td>
-      <td>[2000, 2004, 2008]</td>
-      <td>21795</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>21798</td>
-      <td>ABRAHAM, DANIEL</td>
-      <td>WEST PALM BEACH</td>
-      <td>FL</td>
-      <td>33401</td>
-      <td>[2000, 2002, 2004, 2006, 2008, 2010, 2012, 2014]</td>
-      <td>21795</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>21799</td>
-      <td>ABRAHAM, DANIEL</td>
-      <td>WEST PALM BEACH</td>
-      <td>FL</td>
-      <td>334016122</td>
-      <td>[2014, 2016]</td>
-      <td>21795</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>21801</td>
-      <td>ABRAHAM, DANIEL</td>
-      <td>WEST PALM BEACH</td>
-      <td>FL</td>
-      <td>334016161</td>
-      <td>[2016, 2018, 2020]</td>
-      <td>21795</td>
-    </tr>
-    <tr>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-    </tr>
-    <tr>
-      <td>1428</td>
-      <td>13260841</td>
-      <td>YASS, JEFFREY S.</td>
-      <td>HAVERFORD</td>
-      <td>PA</td>
-      <td>190411804</td>
-      <td>[2010]</td>
-      <td>13260803</td>
-    </tr>
-    <tr>
-      <td>1429</td>
-      <td>13260839</td>
-      <td>YASS, JEFFREY S.</td>
-      <td>BALA CYNWYD</td>
-      <td>PA</td>
-      <td>19004</td>
-      <td>[2014, 2016, 2018]</td>
-      <td>13260803</td>
-    </tr>
-    <tr>
-      <td>1430</td>
-      <td>13260840</td>
-      <td>YASS, JEFFREY S.</td>
-      <td>HAVERFORD</td>
-      <td>PA</td>
-      <td>19041</td>
-      <td>[2002]</td>
-      <td>13260803</td>
-    </tr>
-    <tr>
-      <td>1431</td>
-      <td>13260842</td>
-      <td>YASS, JEFFREY S MR.</td>
-      <td>HAVERFORD</td>
-      <td>PA</td>
-      <td>19041</td>
-      <td>[2006]</td>
-      <td>13260803</td>
-    </tr>
-    <tr>
-      <td>1432</td>
-      <td>13260843</td>
-      <td>YASS, JEFFREY S. MR.</td>
-      <td>HAVERFORD</td>
-      <td>PA</td>
-      <td>19041</td>
-      <td>[2004]</td>
-      <td>13260803</td>
-    </tr>
-  </tbody>
-</table>
-<p>1433 rows × 7 columns</p>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Create-ctx_contrib">Create <code>ctx_contrib</code><a class="anchor-link" href="#Create-ctx_contrib">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[26]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_contrib as
-select ic.*,
-       ix.donor_indiv_id
-  from ctx_indiv ix
-  join indiv_contrib ic on ic.indiv_id = ix.id
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[26]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[27]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
 select count(*)             as contribs,
        sum(transaction_amt) as total_amt,
        array_agg(distinct elect_cycle) as elect_cycles
-  from ctx_contrib
+  from ctx_indiv_contrib
 </pre></div>
 
     </div>
@@ -15828,7 +14447,7 @@ select count(*)             as contribs,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[27]:</div>
+    <div class="prompt output_prompt">Out[13]:</div>
 
 
 
@@ -15859,8 +14478,8 @@ select count(*)             as contribs,
   <tbody>
     <tr>
       <td>0</td>
-      <td>20567</td>
-      <td>2174445937.00</td>
+      <td>101</td>
+      <td>264450.00</td>
       <td>[2000, 2002, 2004, 2006, 2008, 2010, 2012, 201...</td>
     </tr>
   </tbody>

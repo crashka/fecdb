@@ -13087,7 +13087,7 @@ div#notebook {
 </ul>
 <p><strong>Dependent Context Views</strong></p>
 <ul>
-<li><code>ctx_contrib</code> (<em>without</em> <code>donor_indiv_id</code>)</li>
+<li><code>ctx_indiv_contrib</code></li>
 </ul>
 
 </div>
@@ -13096,11 +13096,13 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Notebook-Setup">Notebook Setup<a class="anchor-link" href="#Notebook-Setup">&#182;</a></h2><ul>
-<li>Configure database connect information and options</li>
-<li>Clear potentially interfering context (PostgreSQL doesn't let you replace a view definition with conflicting column names)</li>
-<li>Set styling for notebook</li>
-</ul>
+<h2 id="Notebook-Setup">Notebook Setup<a class="anchor-link" href="#Notebook-Setup">&#182;</a></h2><h3 id="Configure-database-connect-info/options">Configure database connect info/options<a class="anchor-link" href="#Configure-database-connect-info/options">&#182;</a></h3><p>Note: database connect string can be specified on the initial <code>%sql</code> command:</p>
+<div class="highlight"><pre><span></span><span class="n">database_url</span> <span class="o">=</span> <span class="s2">&quot;postgresql+psycopg2://user@localhost/fecdb&quot;</span>
+<span class="o">%</span><span class="n">sql</span> <span class="err">$</span><span class="n">database_url</span>
+</pre></div>
+<p>Or, connect string is taken from DATABASE_URL environment variable (if not specified for <code>%sql</code>):</p>
+<div class="highlight"><pre><span></span><span class="o">%</span><span class="n">sql</span>
+</pre></div>
 
 </div>
 </div>
@@ -13110,12 +13112,11 @@ div#notebook {
 <div class="prompt input_prompt">In&nbsp;[1]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="n">sqlconnect</span> <span class="o">=</span> <span class="s2">&quot;postgresql+psycopg2://crash@localhost/fecdb&quot;</span>
-
-<span class="o">%</span><span class="k">load_ext</span> sql
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">load_ext</span> sql
 <span class="o">%</span><span class="k">config</span> SqlMagic.autopandas=True
 <span class="o">%</span><span class="k">config</span> InteractiveShell.ast_node_interactivity=&#39;last_expr_or_assign&#39;
-<span class="o">%</span><span class="k">sql</span> $sqlconnect
+<span class="c1"># connect string taken from DATABASE_URL environment variable</span>
+<span class="o">%</span><span class="k">sql</span>
 </pre></div>
 
     </div>
@@ -13146,7 +13147,7 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Note that we drop <em>all</em> context views so we won't have any inconsistencies after this notebook is run.  After defining <code>ctx_indiv</code> below, we will define all dependent views (see Overview, above), and leave any higher-order or orthogonal views undefined</p>
+<h3 id="Clear-context">Clear context<a class="anchor-link" href="#Clear-context">&#182;</a></h3><p>Note that we drop <em>all</em> context views so we won't have any inconsistencies after this notebook is run.  After defining <code>ctx_indiv</code> below, we will define all dependent views (see Overview, above), and leave any higher-order or orthogonal views undefined</p>
 
 </div>
 </div>
@@ -13156,13 +13157,15 @@ div#notebook {
 <div class="prompt input_prompt">In&nbsp;[2]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> drop view if exists ctx_contrib   cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_indiv     cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_donor     cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg_memb cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg      cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg_memb cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg      cascade
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg_memb     cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg          cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_donor_contrib cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_donor         cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_household     cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg_memb     cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg          cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_indiv_contrib cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_indiv         cascade
 </pre></div>
 
     </div>
@@ -13180,6 +13183,10 @@ div#notebook {
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+ * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+ * postgresql+psycopg2://crash@localhost/fecdb
 Done.
  * postgresql+psycopg2://crash@localhost/fecdb
 Done.
@@ -13235,6 +13242,13 @@ Done.
 </div>
 </div>
 
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Set-styling">Set styling<a class="anchor-link" href="#Set-styling">&#182;</a></h3>
+</div>
+</div>
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
@@ -13510,21 +13524,21 @@ select id,
     </tr>
     <tr>
       <td>8</td>
-      <td>10527441</td>
-      <td>SANDELL, SCOTT D. MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2000, 2008, 2010, 2012]</td>
-    </tr>
-    <tr>
-      <td>9</td>
       <td>10527434</td>
       <td>SANDELL, SCOTT D</td>
       <td>MENLO PARK</td>
       <td>CA</td>
       <td>940256112</td>
       <td>[2014]</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>10527441</td>
+      <td>SANDELL, SCOTT D. MR.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2000, 2008, 2010, 2012]</td>
     </tr>
     <tr>
       <td>10</td>
@@ -13546,21 +13560,21 @@ select id,
     </tr>
     <tr>
       <td>12</td>
-      <td>10527436</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2012]</td>
-    </tr>
-    <tr>
-      <td>13</td>
       <td>10527432</td>
       <td>SANDELL, SCOTT</td>
       <td>PORTOLA VALLEY</td>
       <td>CA</td>
       <td>940287608</td>
       <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>13</td>
+      <td>10527436</td>
+      <td>SANDELL, SCOTT D</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>94028</td>
+      <td>[2012]</td>
     </tr>
     <tr>
       <td>14</td>
@@ -13612,7 +13626,7 @@ select id,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Create-Dependent-Views">Create Dependent Views<a class="anchor-link" href="#Create-Dependent-Views">&#182;</a></h2><h3 id="Create-ctx_contrib">Create <code>ctx_contrib</code><a class="anchor-link" href="#Create-ctx_contrib">&#182;</a></h3><p>Now we'll create the context view for the contributions from the targeted "Individual" records</p>
+<h2 id="Create-Dependent-Views">Create Dependent Views<a class="anchor-link" href="#Create-Dependent-Views">&#182;</a></h2><h3 id="Create-ctx_indiv_contrib">Create <code>ctx_indiv_contrib</code><a class="anchor-link" href="#Create-ctx_indiv_contrib">&#182;</a></h3><p>Now we'll create the context view for the contributions from the targeted "Individual" records</p>
 
 </div>
 </div>
@@ -13623,7 +13637,7 @@ select id,
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_contrib as
+create or replace view ctx_indiv_contrib as
 select ic.*
   from ctx_indiv ix
   join indiv_contrib ic on ic.indiv_id = ix.id
@@ -13705,7 +13719,7 @@ Done.
 select count(*)             as contribs,
        sum(transaction_amt) as total_amt,
        array_agg(distinct elect_cycle) as elect_cycles
-  from ctx_contrib
+  from ctx_indiv_contrib
 </pre></div>
 
     </div>
@@ -13775,15 +13789,6 @@ select count(*)             as contribs,
 </div>
 </div>
 
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Summary">Summary<a class="anchor-link" href="#Summary">&#182;</a></h2><p>It is significant that the only difference in the "Single person use case" and the "Multi-person use case" above was the definition of the <code>indiv_ctx</code> view.  The contribution context (and hence the SQL definition of <code>contrib_ctx</code>) is exactly dependent upon the "Individual" context, and any queries used for investigation or reporting based on either of these context views can be reused without change when targeting other sets of "Individual" records.</p>
-<p>Note that the context views (here and in subsequent notebooks) can also be created as <a href="https://www.postgresql.org/docs/10/rules-materializedviews.html">materialized views</a>, especially if they are somewhat expensive to query (large or complex query logic or result sets) and will be used multiple times for investigation or reporting.  Purely dependent context views (e.g. <code>indiv_contrib</code> in this notebook) do not have to be recreated when the underlying context is changed, though they will need to be "<a href="https://www.postgresql.org/docs/10/sql-refreshmaterializedview.html">refreshed</a>" if defined as a materialized view.</p>
-
-</div>
-</div>
 </div>
     </div>
   </div>

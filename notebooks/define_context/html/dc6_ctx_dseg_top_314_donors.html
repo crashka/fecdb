@@ -2,7 +2,7 @@
 <html>
 <head><meta charset="utf-8" />
 
-<title>dc2_ctx_indiv_multi_person</title>
+<title>dc6_ctx_dseg_top_314_donors</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
@@ -13077,17 +13077,21 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h1>Define Individual Context &ndash; Multi-Person Use Case</h1>
-<h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Explore the FEC data by specifying SQL predicates that identify <strong>Individuals</strong>, which are people identities extracted&mdash;and somewhat cleansed&mdash;from the <a href="https://www.fec.gov/campaign-finance-data/contributions-individuals-file-description/">Individual Contributions</a> file.  Inidividual records (stored in the <code>indiv</code> table), are basically distinct combinations of name and address information (city, state, zipcode) that have not been aggressively deduplicated.  Thus, there will be multiple records for a real-world person if there are variants (or typos or deception) in the identifying information for contribution records.</p>
-<p>Querying by Individual can be used to target all of the <code>indiv</code> records (and associated contribution data in <code>indiv_contrib</code>) for a single person, or for a set of people to be explored collectively.  An example of the second usage will be presented here (the first is covered in the preceding <code>dc1</code> notebook).  One of the limitation of Querying by Individual is that it is difficult to distinguish between the contribution of distinct people identities within a result set.</p>
-<p>Note that this approach will create the following query contexts (each of which may be used in formulating specific queries for investigation or reporting):</p>
+<h1>Define Donor Segment Context &ndash; Top Contributors to the 314 PAC</h1>
+<h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Explore the FEC data by specifying SQL predicates that identify <strong>Donor Segments</strong>, which are static lists of Donor (<code>donor_indiv</code> view) records.  Note that a Donor Segment context may including one <em>or more</em> segments (e.g. by name or ID).  As with Donor contexts, Donor identities <strong><em>are</em></strong> discernible within queries using this context type.</p>
+<p>For this notebook, we will create a Donor Segment based on top contributors to the 314 PAC.  This represents a common use case of manually creating a single Donor Segment and setting a query context in which to explore the collective giving patterns for the included members.  As a basis for the Donors comprising the Segment, we will also group the underlying Individual records into Donors using a simple name and address matching scheme.  As described below, this grouping scheme is by no means rigorous, but demonstrates an approach to bringing better integrity to some of the variability in the base FEC data sets.</p>
+<p>This approach will create the following query contexts:</p>
 <p><strong>Principal Context View</strong></p>
 <ul>
-<li><code>ctx_indiv</code></li>
+<li><code>ctx_dseg</code></li>
 </ul>
 <p><strong>Dependent Context Views</strong></p>
 <ul>
+<li><code>ctx_dseg_memb</code></li>
+<li><code>ctx_donor</code></li>
+<li><code>ctx_indiv</code></li>
 <li><code>ctx_indiv_contrib</code></li>
+<li><code>ctx_donor_contrib</code></li>
 </ul>
 
 </div>
@@ -13295,7 +13299,7 @@ Done.
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Create-Principal-View-(ctx_indiv)">Create Principal View (<code>ctx_indiv</code>)<a class="anchor-link" href="#Create-Principal-View-(ctx_indiv)">&#182;</a></h2><p>For this use case, we'll identify the <code>indiv</code> records associated with the household (multiple people) previously queried (in <code>el_queries1.sql</code> and <code>el_queries3.sql</code>)</p>
+<h2 id="Create-Donor-Segment-for-Top-314-Donors">Create Donor Segment for Top 314 Donors<a class="anchor-link" href="#Create-Donor-Segment-for-Top-314-Donors">&#182;</a></h2><p>We clear out any previous versions of these temporary tables/views that are created and used in this notebook (to ensure that all of the SQL for them shown below is executed, since this use case is written for demonstration purposes).</p>
 
 </div>
 </div>
@@ -13305,12 +13309,9 @@ Done.
 <div class="prompt input_prompt">In&nbsp;[4]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_indiv as
-select *
-  from indiv
- where name like &#39;SANDELL, %&#39;
-   and zip_code ~ &#39;9402[58]&#39;
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> delete from donor_seg where name = &#39;Top 314 Donors&#39;
+<span class="o">%</span><span class="k">sql</span> drop materialized view if exists donor_sum_314 cascade
+<span class="o">%</span><span class="k">sql</span> drop materialized view if exists indiv_group cascade
 </pre></div>
 
     </div>
@@ -13328,6 +13329,10 @@ select *
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
+0 rows affected.
+ * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+ * postgresql+psycopg2://crash@localhost/fecdb
 Done.
 </pre>
 </div>
@@ -13375,7 +13380,8 @@ Done.
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Let's take a quick look at the context we just set (for validation) before proceeding</p>
+<p>This view is a rough cut approach to grouping <code>indiv</code> records that are likely to represent the same real-wold person.  Individuals here are grouped together if matching on the combination of: last name, first three characters of first name, and first three characters of zip code.  Note that this view only considers the most standard pattern of name representation in the FEC data (i.e "&lt;last&gt;, &lt;first&gt; [&lt;middle&gt;|&lt;titles&gt;|&lt;degrees&gt;|...]"); other non-well-formed representations will be skipped (or not properly parsed and associated).</p>
+<p>This quick and dirty logic is used for creating Donors from Individuals in this notebook (for demonstration purposes), but should be replaced later by higher-definition, context-sensitive algorithms when trying to get more accurate analysis and reporting out of the data.</p>
 
 </div>
 </div>
@@ -13386,13 +13392,18 @@ Done.
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select id,
-       name,
-       city,
-       state,
-       zip_code,
-       elect_cycles
-  from ctx_indiv
+create materialized view if not exists indiv_group as
+select ip.part1                  as last_name,
+       substr(ip.part2, 1, 3)    as first_name_pfx,
+       substr(ip.zip_code, 1, 3) as zip_pfx,
+       count(distinct ip.id)     as indivs,
+       array_agg(distinct ip.id) as indiv_ids
+  from indiv_parsed ip
+ where ip.name ~ &#39;^[A-Z][^,]&#39;
+   and ip.zip_code is not null
+   and ip.num_parts &gt; 1
+   and ip.part1 !~ &#39; &#39;
+ group by 1, 2, 3
 </pre></div>
 
     </div>
@@ -13410,7 +13421,7 @@ select id,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-27 rows affected.
+6738578 rows affected.
 </pre>
 </div>
 </div>
@@ -13440,258 +13451,9 @@ select id,
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>id</th>
-      <th>name</th>
-      <th>city</th>
-      <th>state</th>
-      <th>zip_code</th>
-      <th>elect_cycles</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>0</td>
-      <td>10527369</td>
-      <td>SANDELL, JENNIFER A MS.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004]</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>10527363</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004, 2006, 2008, 2010]</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>10527371</td>
-      <td>SANDELL, JENNIFER MS.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004]</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>10527368</td>
-      <td>SANDELL, JENNIFER A</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2006, 2008]</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>10527370</td>
-      <td>SANDELL, JENNIFER AYER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004, 2010]</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>10527364</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940250</td>
-      <td>[2004]</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>10527366</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>7</td>
-      <td>10527365</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>8</td>
-      <td>10527440</td>
-      <td>SANDELL, SCOTT D.</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>9</td>
-      <td>10527433</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004, 2006, 2008, 2010]</td>
-    </tr>
-    <tr>
-      <td>10</td>
-      <td>10527447</td>
-      <td>SANDELL, SCOTT MRS.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004]</td>
-    </tr>
-    <tr>
-      <td>11</td>
-      <td>10527430</td>
-      <td>SANDELL, SCOTT</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>12</td>
-      <td>10527429</td>
-      <td>SANDELL, SCOTT</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2000, 2008, 2010, 2012, 2016]</td>
-    </tr>
-    <tr>
-      <td>13</td>
-      <td>10527435</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>14</td>
-      <td>10527437</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>15</td>
-      <td>10527445</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>16</td>
-      <td>10527438</td>
-      <td>SANDELL, SCOTT D.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2010]</td>
-    </tr>
-    <tr>
-      <td>17</td>
-      <td>10527431</td>
-      <td>SANDELL, SCOTT</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2010, 2016]</td>
-    </tr>
-    <tr>
-      <td>18</td>
-      <td>10527434</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940256112</td>
-      <td>[2014]</td>
-    </tr>
-    <tr>
-      <td>19</td>
-      <td>10527441</td>
-      <td>SANDELL, SCOTT D. MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2000, 2008, 2010, 2012]</td>
-    </tr>
-    <tr>
-      <td>20</td>
-      <td>10527444</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>21</td>
-      <td>10527443</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940256940</td>
-      <td>[2004, 2006]</td>
-    </tr>
-    <tr>
-      <td>22</td>
-      <td>10527432</td>
-      <td>SANDELL, SCOTT</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>23</td>
-      <td>10527436</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2012]</td>
-    </tr>
-    <tr>
-      <td>24</td>
-      <td>10527446</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>25</td>
-      <td>10527439</td>
-      <td>SANDELL, SCOTT D.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>26</td>
-      <td>10527442</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2000, 2002, 2004, 2006]</td>
-    </tr>
   </tbody>
 </table>
 </div>
@@ -13706,7 +13468,8 @@ select id,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Create-Dependent-Views">Create Dependent Views<a class="anchor-link" href="#Create-Dependent-Views">&#182;</a></h2><h3 id="Create-ctx_indiv_contrib">Create <code>ctx_indiv_contrib</code><a class="anchor-link" href="#Create-ctx_indiv_contrib">&#182;</a></h3><p>Now we'll create the context view for the contributions from the targeted "Individual" records</p>
+<p>Create a view to represent <code>indiv_contrib</code> records associated with any committee whose name is prefixed by "314" (this qualification can be amended if there are other patterns representing the same PAC; currently there are no others with "314" elsewhere in the name)</p>
+<p>Note that this serves as a template for creating other segments of contributions, and hence the Donors (or Inidividuals, if wanting to create an Individual Segment instead) behind them, for doing a similar type of investigation</p>
 
 </div>
 </div>
@@ -13717,10 +13480,13 @@ select id,
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_indiv_contrib as
-select ic.*
-  from ctx_indiv ix
-  join indiv_contrib ic on ic.indiv_id = ix.id
+create or replace view contrib_to_314 as
+select cm.cmte_nm,
+       ic.*
+  from cmte cm
+  join indiv_contrib ic
+       on ic.cmte_id = cm.cmte_id
+ where cm.cmte_nm like &#39;314%&#39;
 </pre></div>
 
     </div>
@@ -13785,7 +13551,8 @@ Done.
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>And some quick validation on the view</p>
+<p>We now create a view summarizing the contributions to the "314" committees from the Individual groupings (i.e. approximation of Donors) created above.  The aggregation for each "Donor" includes the list of consolidated <code>indiv_id</code> keys, the total number of contributions, and the total and average amounts.</p>
+<p>SQL design note: not obvious whether it is better to re-aggregate the unnested ids (even though we are not able to omit the <code>distinct</code> qualifier), or select <code>ig.indiv_ids</code> and add to GROUP BY clause&mdash;voting for the former option right now.</p>
 
 </div>
 </div>
@@ -13793,6 +13560,3071 @@ Done.
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">In&nbsp;[7]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+create materialized view donor_sum_314 as
+with indiv_group_memb as (
+    select ig.last_name,
+           ig.first_name_pfx,
+           ig.zip_pfx,
+           --ig.indiv_ids,
+           unnest(ig.indiv_ids) as indiv_id
+      from indiv_group ig
+)
+select igm.last_name,
+       igm.first_name_pfx,
+       igm.zip_pfx,
+       array_agg(distinct igm.indiv_id)
+                                 as indiv_ids,
+       count(ct.transaction_amt) as contribs,
+       sum(ct.transaction_amt)   as total_amt,
+       round(sum(ct.transaction_amt) / count(ct.transaction_amt), 2)
+                                 as avg_amt,
+       array_agg(distinct ct.elect_cycle)
+                                 as elect_cycles
+  from indiv_group_memb igm
+  join contrib_to_314 ct on ct.indiv_id = igm.indiv_id
+ group by 1, 2, 3
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+2438 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[7]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Create a couple of indexes for performance.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[8]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> create index donor_sum_314_total_amt on donor_sum_314 (total_amt)
+<span class="o">%</span><span class="k">sql</span> create index donor_sum_314_avg_amt on donor_sum_314 (avg_amt)
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+ * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[8]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Let's inspect the top 50 "Donors" (the actual Donor records not yet created) by total contribution amount.  This is the list that we will create our segment from.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[9]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select *
+  from donor_sum_314
+ order by total_amt desc, contribs desc
+ limit 50
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+50 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[9]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>last_name</th>
+      <th>first_name_pfx</th>
+      <th>zip_pfx</th>
+      <th>indiv_ids</th>
+      <th>contribs</th>
+      <th>total_amt</th>
+      <th>avg_amt</th>
+      <th>elect_cycles</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>STOREY</td>
+      <td>BAY</td>
+      <td>191</td>
+      <td>[11659801]</td>
+      <td>21</td>
+      <td>240000.00</td>
+      <td>11428.57</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>ROSZAK</td>
+      <td>MAT</td>
+      <td>600</td>
+      <td>[10325529]</td>
+      <td>2</td>
+      <td>204562.00</td>
+      <td>102281.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>PROCKOP</td>
+      <td>DAR</td>
+      <td>191</td>
+      <td>[9683572]</td>
+      <td>2</td>
+      <td>200000.00</td>
+      <td>100000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>PARK</td>
+      <td>TOD</td>
+      <td>940</td>
+      <td>[9188602]</td>
+      <td>2</td>
+      <td>200000.00</td>
+      <td>100000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>SHENKER</td>
+      <td>SCO</td>
+      <td>947</td>
+      <td>[10979072]</td>
+      <td>7</td>
+      <td>105500.00</td>
+      <td>15071.43</td>
+      <td>[2014, 2018]</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>GIRARDI</td>
+      <td>THO</td>
+      <td>900</td>
+      <td>[4336953]</td>
+      <td>4</td>
+      <td>100000.00</td>
+      <td>25000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>NASH</td>
+      <td>RIC</td>
+      <td>598</td>
+      <td>[8656333]</td>
+      <td>2</td>
+      <td>100000.00</td>
+      <td>50000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>ABRAMSON</td>
+      <td>RON</td>
+      <td>200</td>
+      <td>[28429]</td>
+      <td>4</td>
+      <td>50000.00</td>
+      <td>12500.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>TAYLOR</td>
+      <td>DAL</td>
+      <td>606</td>
+      <td>[11902785]</td>
+      <td>2</td>
+      <td>50000.00</td>
+      <td>25000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>LARSEN</td>
+      <td>CHR</td>
+      <td>941</td>
+      <td>[6822374]</td>
+      <td>2</td>
+      <td>50000.00</td>
+      <td>25000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>MORGAN</td>
+      <td>HOW</td>
+      <td>100</td>
+      <td>[8417423]</td>
+      <td>2</td>
+      <td>50000.00</td>
+      <td>25000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>SOLIMAN</td>
+      <td>KAR</td>
+      <td>926</td>
+      <td>[11356137]</td>
+      <td>2</td>
+      <td>49890.00</td>
+      <td>24945.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>MCEVOY</td>
+      <td>NIO</td>
+      <td>941</td>
+      <td>[7863787]</td>
+      <td>42</td>
+      <td>42966.00</td>
+      <td>1023.00</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>13</td>
+      <td>KAHN</td>
+      <td>RON</td>
+      <td>941</td>
+      <td>[6110433, 6110440]</td>
+      <td>13</td>
+      <td>42000.00</td>
+      <td>3230.77</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>14</td>
+      <td>PARK</td>
+      <td>DAV</td>
+      <td>940</td>
+      <td>[9165471]</td>
+      <td>4</td>
+      <td>40312.00</td>
+      <td>10078.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>15</td>
+      <td>TORRES</td>
+      <td>TOM</td>
+      <td>770</td>
+      <td>[12143213]</td>
+      <td>36</td>
+      <td>36000.00</td>
+      <td>1000.00</td>
+      <td>[2014, 2016]</td>
+    </tr>
+    <tr>
+      <td>16</td>
+      <td>NEGROPONTE</td>
+      <td>NIC</td>
+      <td>021</td>
+      <td>[8688914]</td>
+      <td>2</td>
+      <td>22378.00</td>
+      <td>11189.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>17</td>
+      <td>BASSI</td>
+      <td>STE</td>
+      <td>920</td>
+      <td>[678448]</td>
+      <td>2</td>
+      <td>20466.00</td>
+      <td>10233.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>18</td>
+      <td>GROSSBLATT</td>
+      <td>DAV</td>
+      <td>941</td>
+      <td>[4684620]</td>
+      <td>2</td>
+      <td>20230.00</td>
+      <td>10115.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>19</td>
+      <td>CUELLAR</td>
+      <td>CLI</td>
+      <td>984</td>
+      <td>[2576925]</td>
+      <td>12</td>
+      <td>20050.00</td>
+      <td>1670.83</td>
+      <td>[2020]</td>
+    </tr>
+    <tr>
+      <td>20</td>
+      <td>LAWRENCE</td>
+      <td>FRA</td>
+      <td>640</td>
+      <td>[6872845]</td>
+      <td>6</td>
+      <td>20010.00</td>
+      <td>3335.00</td>
+      <td>[2020]</td>
+    </tr>
+    <tr>
+      <td>21</td>
+      <td>SWINDELL</td>
+      <td>DAV</td>
+      <td>021</td>
+      <td>[11823232]</td>
+      <td>4</td>
+      <td>20000.00</td>
+      <td>5000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>22</td>
+      <td>PROOPS</td>
+      <td>JAY</td>
+      <td>598</td>
+      <td>[9688035]</td>
+      <td>2</td>
+      <td>20000.00</td>
+      <td>10000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>23</td>
+      <td>GURAL</td>
+      <td>JEF</td>
+      <td>100</td>
+      <td>[4745356]</td>
+      <td>2</td>
+      <td>20000.00</td>
+      <td>10000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>24</td>
+      <td>SHOCH</td>
+      <td>JOH</td>
+      <td>940</td>
+      <td>[11024692]</td>
+      <td>2</td>
+      <td>20000.00</td>
+      <td>10000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>25</td>
+      <td>HONARKAR</td>
+      <td>MOH</td>
+      <td>926</td>
+      <td>[5486301]</td>
+      <td>2</td>
+      <td>20000.00</td>
+      <td>10000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>26</td>
+      <td>BYERS</td>
+      <td>BRO</td>
+      <td>940</td>
+      <td>[1661575]</td>
+      <td>2</td>
+      <td>20000.00</td>
+      <td>10000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>27</td>
+      <td>HUDSON</td>
+      <td>BRU</td>
+      <td>132</td>
+      <td>[5601495]</td>
+      <td>6</td>
+      <td>18000.00</td>
+      <td>3000.00</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>28</td>
+      <td>JHONG</td>
+      <td>EUG</td>
+      <td>940</td>
+      <td>[5902719]</td>
+      <td>2</td>
+      <td>16604.00</td>
+      <td>8302.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>29</td>
+      <td>KARPLUS</td>
+      <td>BAR</td>
+      <td>913</td>
+      <td>[6169689]</td>
+      <td>4</td>
+      <td>16000.00</td>
+      <td>4000.00</td>
+      <td>[2020]</td>
+    </tr>
+    <tr>
+      <td>30</td>
+      <td>GOLLON</td>
+      <td>PET</td>
+      <td>117</td>
+      <td>[4435025]</td>
+      <td>18</td>
+      <td>15900.00</td>
+      <td>883.33</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>31</td>
+      <td>NORTON</td>
+      <td>JAC</td>
+      <td>100</td>
+      <td>[8848719, 8848720, 8848731]</td>
+      <td>18</td>
+      <td>15700.00</td>
+      <td>872.22</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>32</td>
+      <td>GILBERT</td>
+      <td>JOH</td>
+      <td>024</td>
+      <td>[4293837]</td>
+      <td>90</td>
+      <td>15450.00</td>
+      <td>171.67</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>33</td>
+      <td>KAPER</td>
+      <td>TAS</td>
+      <td>019</td>
+      <td>[6147085]</td>
+      <td>10</td>
+      <td>15000.00</td>
+      <td>1500.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>34</td>
+      <td>LEVINSON</td>
+      <td>FRA</td>
+      <td>949</td>
+      <td>[7037936]</td>
+      <td>3</td>
+      <td>15000.00</td>
+      <td>5000.00</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>35</td>
+      <td>BEEUWKES</td>
+      <td>REI</td>
+      <td>017</td>
+      <td>[779629]</td>
+      <td>3</td>
+      <td>15000.00</td>
+      <td>5000.00</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>36</td>
+      <td>KIRK</td>
+      <td>CLA</td>
+      <td>100</td>
+      <td>[6433238, 6433258]</td>
+      <td>8</td>
+      <td>14500.00</td>
+      <td>1812.50</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>37</td>
+      <td>JENCKS</td>
+      <td>CHR</td>
+      <td>021</td>
+      <td>[5870457]</td>
+      <td>42</td>
+      <td>14320.00</td>
+      <td>340.95</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>38</td>
+      <td>FERSTER</td>
+      <td>DAV</td>
+      <td>600</td>
+      <td>[3678807]</td>
+      <td>6</td>
+      <td>13500.00</td>
+      <td>2250.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>39</td>
+      <td>NIELSEN</td>
+      <td>SHE</td>
+      <td>600</td>
+      <td>[8793106]</td>
+      <td>60</td>
+      <td>13238.00</td>
+      <td>220.63</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>40</td>
+      <td>HORLICK</td>
+      <td>SUS</td>
+      <td>323</td>
+      <td>[5515167]</td>
+      <td>60</td>
+      <td>11716.00</td>
+      <td>195.27</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>41</td>
+      <td>TUSK</td>
+      <td>BRA</td>
+      <td>100</td>
+      <td>[12265351]</td>
+      <td>2</td>
+      <td>10800.00</td>
+      <td>5400.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>42</td>
+      <td>FORDE</td>
+      <td>JAM</td>
+      <td>927</td>
+      <td>[3850042]</td>
+      <td>2</td>
+      <td>10800.00</td>
+      <td>5400.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>43</td>
+      <td>BERG</td>
+      <td>FRE</td>
+      <td>045</td>
+      <td>[877907]</td>
+      <td>6</td>
+      <td>10260.00</td>
+      <td>1710.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>44</td>
+      <td>MOUNT</td>
+      <td>PHY</td>
+      <td>064</td>
+      <td>[8496236]</td>
+      <td>10</td>
+      <td>10092.00</td>
+      <td>1009.20</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>45</td>
+      <td>POWERS</td>
+      <td>ANN</td>
+      <td>960</td>
+      <td>[9625220]</td>
+      <td>10</td>
+      <td>10000.00</td>
+      <td>1000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>46</td>
+      <td>HALL</td>
+      <td>CLA</td>
+      <td>145</td>
+      <td>[4828088]</td>
+      <td>4</td>
+      <td>10000.00</td>
+      <td>2500.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>47</td>
+      <td>BLUE</td>
+      <td>ALL</td>
+      <td>902</td>
+      <td>[1083690]</td>
+      <td>2</td>
+      <td>10000.00</td>
+      <td>5000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>48</td>
+      <td>FRIEDMAN</td>
+      <td>DON</td>
+      <td>294</td>
+      <td>[3993057]</td>
+      <td>2</td>
+      <td>10000.00</td>
+      <td>5000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>49</td>
+      <td>FRIEDMAN</td>
+      <td>RAN</td>
+      <td>294</td>
+      <td>[3997846]</td>
+      <td>2</td>
+      <td>10000.00</td>
+      <td>5000.00</td>
+      <td>[2018]</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Now we use <code>create_donor_seg</code> function to create the segment based on the query we just executed.  This step also creates the actual underlying Donor records from the groupings determined by <code>indiv_group</code>.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[10]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+with donor_set as (
+    select row(indiv_ids)::id_array as ids
+      from donor_sum_314
+     order by total_amt desc, contribs desc
+     limit 50
+)
+select create_donor_seg(array_agg(ids), &#39;Top 314 Donors&#39;) as seg_id
+  from donor_set
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+1 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[10]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>seg_id</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>239</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Create-Principal-View-(ctx_dseg)">Create Principal View (<code>ctx_dseg</code>)<a class="anchor-link" href="#Create-Principal-View-(ctx_dseg)">&#182;</a></h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[11]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+create or replace view ctx_dseg as
+select id,
+       name,
+       description
+  from donor_seg ds
+ where ds.name = &#39;Top 314 Donors&#39;
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[11]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[12]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select *
+  from ctx_dseg
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+1 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[12]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>id</th>
+      <th>name</th>
+      <th>description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>239</td>
+      <td>Top 314 Donors</td>
+      <td>None</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Create-Dependent-Views">Create Dependent Views<a class="anchor-link" href="#Create-Dependent-Views">&#182;</a></h2><h3 id="Create-ctx_dseg_memb">Create <code>ctx_dseg_memb</code><a class="anchor-link" href="#Create-ctx_dseg_memb">&#182;</a></h3>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[13]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+create or replace view ctx_dseg_memb as
+select dsm.*
+  from ctx_dseg dsx
+  join donor_seg_memb dsm on dsm.donor_seg_id = dsx.id
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[13]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[14]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select ds.name as dseg_name,
+       d.name  as indiv_name,
+       d.city,
+       d.state,
+       d.zip_code,
+       d.elect_cycles
+  from ctx_dseg_memb dsmx
+  join donor_seg ds on ds.id = dsmx.donor_seg_id
+  join donor_indiv d on d.id = dsmx.donor_indiv_id
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+50 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[14]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>dseg_name</th>
+      <th>indiv_name</th>
+      <th>city</th>
+      <th>state</th>
+      <th>zip_code</th>
+      <th>elect_cycles</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>Top 314 Donors</td>
+      <td>ABRAMSON, RONALD</td>
+      <td>WASHINGTON</td>
+      <td>DC</td>
+      <td>200063807</td>
+      <td>[2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>Top 314 Donors</td>
+      <td>BASSI, STEVE</td>
+      <td>CARLSBAD</td>
+      <td>CA</td>
+      <td>920081900</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Top 314 Donors</td>
+      <td>BEEUWKES, REINIER</td>
+      <td>CONCORD</td>
+      <td>MA</td>
+      <td>017425322</td>
+      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>Top 314 Donors</td>
+      <td>BERG, FRED</td>
+      <td>CUSHING</td>
+      <td>ME</td>
+      <td>045633307</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>Top 314 Donors</td>
+      <td>BLUE, ALLEN</td>
+      <td>VENICE</td>
+      <td>CA</td>
+      <td>902913830</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>Top 314 Donors</td>
+      <td>BYERS, BROOK</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940257020</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>Top 314 Donors</td>
+      <td>CUELLAR, CLIFFORD</td>
+      <td>TACOMA</td>
+      <td>WA</td>
+      <td>984053360</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>Top 314 Donors</td>
+      <td>FERSTER, DAVID</td>
+      <td>WILMETTE</td>
+      <td>IL</td>
+      <td>600911553</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>Top 314 Donors</td>
+      <td>FORDE, JAMES</td>
+      <td>TUSTIN</td>
+      <td>CA</td>
+      <td>927806320</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>Top 314 Donors</td>
+      <td>FRIEDMAN, DONNA</td>
+      <td>MOUNT PLEASANT</td>
+      <td>SC</td>
+      <td>294644305</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>Top 314 Donors</td>
+      <td>FRIEDMAN, RANDOLPH</td>
+      <td>MOUNT PLEASANT</td>
+      <td>SC</td>
+      <td>294644305</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>Top 314 Donors</td>
+      <td>GILBERT, JOHN</td>
+      <td>BROOKLINE</td>
+      <td>MA</td>
+      <td>024465769</td>
+      <td>[2004, 2006, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>Top 314 Donors</td>
+      <td>GIRARDI, THOMAS V.</td>
+      <td>LOS ANGELES</td>
+      <td>CA</td>
+      <td>900171904</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>13</td>
+      <td>Top 314 Donors</td>
+      <td>GOLLON, PETER</td>
+      <td>HUNTINGTON</td>
+      <td>NY</td>
+      <td>117431918</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>14</td>
+      <td>Top 314 Donors</td>
+      <td>GROSSBLATT, DAVID</td>
+      <td>SAN FRANCISCO</td>
+      <td>CA</td>
+      <td>941074317</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>15</td>
+      <td>Top 314 Donors</td>
+      <td>GURAL, JEFFREY</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>100175529</td>
+      <td>[2004, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>16</td>
+      <td>Top 314 Donors</td>
+      <td>HALL, CLAIRE</td>
+      <td>VICTOR</td>
+      <td>NY</td>
+      <td>145641102</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>17</td>
+      <td>Top 314 Donors</td>
+      <td>HONARKAR, MOHAMMAD</td>
+      <td>IRVINE</td>
+      <td>CA</td>
+      <td>926184236</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>18</td>
+      <td>Top 314 Donors</td>
+      <td>HORLICK, SUSAN</td>
+      <td>TALLAHASSEE</td>
+      <td>FL</td>
+      <td>323117834</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>19</td>
+      <td>Top 314 Donors</td>
+      <td>HUDSON, BRUCE S.</td>
+      <td>SYRACUSE</td>
+      <td>NY</td>
+      <td>132103116</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>20</td>
+      <td>Top 314 Donors</td>
+      <td>JENCKS, CHRISTOPHER</td>
+      <td>CAMBRIDGE</td>
+      <td>MA</td>
+      <td>021382409</td>
+      <td>[2004, 2006, 2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>21</td>
+      <td>Top 314 Donors</td>
+      <td>JHONG, EUGENE</td>
+      <td>LOS ALTOS</td>
+      <td>CA</td>
+      <td>940221702</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>22</td>
+      <td>Top 314 Donors</td>
+      <td>KAHN, RONALD N</td>
+      <td>SAN FRANCISCO</td>
+      <td>CA</td>
+      <td>941590599</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>23</td>
+      <td>Top 314 Donors</td>
+      <td>KAPER, TASSO</td>
+      <td>MANCHESTER</td>
+      <td>MA</td>
+      <td>019441048</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>24</td>
+      <td>Top 314 Donors</td>
+      <td>KARPLUS, BARBARA</td>
+      <td>NEWBURY PARK</td>
+      <td>CA</td>
+      <td>913202803</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>25</td>
+      <td>Top 314 Donors</td>
+      <td>KIRK, CLAY</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>100215251</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>26</td>
+      <td>Top 314 Donors</td>
+      <td>LARSEN, CHRIS</td>
+      <td>SAN FRANCISCO</td>
+      <td>CA</td>
+      <td>941091512</td>
+      <td>[2010, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>27</td>
+      <td>Top 314 Donors</td>
+      <td>LAWRENCE, FRANK</td>
+      <td>LEES SUMMIT</td>
+      <td>MO</td>
+      <td>640863079</td>
+      <td>[2016, 2020]</td>
+    </tr>
+    <tr>
+      <td>28</td>
+      <td>Top 314 Donors</td>
+      <td>LEVINSON, FRANK</td>
+      <td>TIBURON</td>
+      <td>CA</td>
+      <td>949202523</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>29</td>
+      <td>Top 314 Donors</td>
+      <td>MCEVOY, NION</td>
+      <td>SAN FRANCISCO</td>
+      <td>CA</td>
+      <td>94118</td>
+      <td>[2002, 2004, 2006, 2008, 2010, 2012, 2014, 201...</td>
+    </tr>
+    <tr>
+      <td>30</td>
+      <td>Top 314 Donors</td>
+      <td>MORGAN, HOWARD L.</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>100657253</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>31</td>
+      <td>Top 314 Donors</td>
+      <td>MOUNT, PHYLLIS F.</td>
+      <td>SOUTHBURY</td>
+      <td>CT</td>
+      <td>064885719</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>32</td>
+      <td>Top 314 Donors</td>
+      <td>NASH, RICHARD</td>
+      <td>MISSOULA</td>
+      <td>MT</td>
+      <td>598045862</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>33</td>
+      <td>Top 314 Donors</td>
+      <td>NEGROPONTE, NICHOLAS</td>
+      <td>CAMBRIDGE</td>
+      <td>MA</td>
+      <td>021421322</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>34</td>
+      <td>Top 314 Donors</td>
+      <td>NIELSEN, SHEILA</td>
+      <td>WINNETKA</td>
+      <td>IL</td>
+      <td>600932015</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>35</td>
+      <td>Top 314 Donors</td>
+      <td>NORTON, JACK</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>10027</td>
+      <td>[2010, 2012, 2014, 2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>36</td>
+      <td>Top 314 Donors</td>
+      <td>PARK, DAVID</td>
+      <td>LOS ALTOS</td>
+      <td>CA</td>
+      <td>940223838</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>37</td>
+      <td>Top 314 Donors</td>
+      <td>PARK, TODD</td>
+      <td>LOS ALTOS HILLS</td>
+      <td>CA</td>
+      <td>940223385</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>38</td>
+      <td>Top 314 Donors</td>
+      <td>POWERS, ANN</td>
+      <td>DUNSMUIR</td>
+      <td>CA</td>
+      <td>960252504</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>39</td>
+      <td>Top 314 Donors</td>
+      <td>PROCKOP, DARWIN J. MD, PHD</td>
+      <td>PHILADELPHIA</td>
+      <td>PA</td>
+      <td>191063913</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>40</td>
+      <td>Top 314 Donors</td>
+      <td>PROOPS, JAY</td>
+      <td>OVANDO</td>
+      <td>MT</td>
+      <td>598540149</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>41</td>
+      <td>Top 314 Donors</td>
+      <td>ROSZAK, MATTHEW</td>
+      <td>WINNETKA</td>
+      <td>IL</td>
+      <td>600933630</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>42</td>
+      <td>Top 314 Donors</td>
+      <td>SHENKER, SCOTT</td>
+      <td>BERKELEY</td>
+      <td>CA</td>
+      <td>947072052</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>43</td>
+      <td>Top 314 Donors</td>
+      <td>SHOCH, JOHN PHD</td>
+      <td>WOODSIDE</td>
+      <td>CA</td>
+      <td>940622538</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>44</td>
+      <td>Top 314 Donors</td>
+      <td>SOLIMAN, KARL</td>
+      <td>IRVINE</td>
+      <td>CA</td>
+      <td>926127186</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>45</td>
+      <td>Top 314 Donors</td>
+      <td>STOREY, BAYARD T PH.D.</td>
+      <td>PHILADELPHIA</td>
+      <td>PA</td>
+      <td>191303202</td>
+      <td>[2006, 2014, 2016]</td>
+    </tr>
+    <tr>
+      <td>46</td>
+      <td>Top 314 Donors</td>
+      <td>SWINDELL, DAVE</td>
+      <td>BOSTON</td>
+      <td>MA</td>
+      <td>021163510</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>47</td>
+      <td>Top 314 Donors</td>
+      <td>TAYLOR, DALE</td>
+      <td>CHICAGO</td>
+      <td>IL</td>
+      <td>606146085</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>48</td>
+      <td>Top 314 Donors</td>
+      <td>TORRES, TOMAS</td>
+      <td>HOUSTON</td>
+      <td>TX</td>
+      <td>770653124</td>
+      <td>[2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>49</td>
+      <td>Top 314 Donors</td>
+      <td>TUSK, BRADLEY</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>100039605</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Create-ctx_donor">Create <code>ctx_donor</code><a class="anchor-link" href="#Create-ctx_donor">&#182;</a></h3><p>Since there is no chance of multiple inclusion of Donors in <code>ctx_dseg_memb</code> (i.e. <code>ctx_dseg</code> does not include more than one Donor Segments), then we can use straight-forward SQL for creating <code>ctx_donor</code> (see similar section in <code>dc7</code> for discussion of a slightly more complicated case).</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[15]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+create or replace view ctx_donor as
+select d.*
+  from ctx_dseg_memb dsmx
+  join donor_indiv d on d.id = dsmx.donor_indiv_id
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[15]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Quick validation&mdash;the rows here should match those queried just before creation of the Donor Segment (above), except full Donor names are now shown.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[16]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select id,
+       name,
+       city,
+       state,
+       zip_code,
+       elect_cycles
+  from ctx_donor
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+50 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[16]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>id</th>
+      <th>name</th>
+      <th>city</th>
+      <th>state</th>
+      <th>zip_code</th>
+      <th>elect_cycles</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>28429</td>
+      <td>ABRAMSON, RONALD</td>
+      <td>WASHINGTON</td>
+      <td>DC</td>
+      <td>200063807</td>
+      <td>[2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>678448</td>
+      <td>BASSI, STEVE</td>
+      <td>CARLSBAD</td>
+      <td>CA</td>
+      <td>920081900</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>779629</td>
+      <td>BEEUWKES, REINIER</td>
+      <td>CONCORD</td>
+      <td>MA</td>
+      <td>017425322</td>
+      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>877907</td>
+      <td>BERG, FRED</td>
+      <td>CUSHING</td>
+      <td>ME</td>
+      <td>045633307</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>1083690</td>
+      <td>BLUE, ALLEN</td>
+      <td>VENICE</td>
+      <td>CA</td>
+      <td>902913830</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>1661575</td>
+      <td>BYERS, BROOK</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940257020</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>2576925</td>
+      <td>CUELLAR, CLIFFORD</td>
+      <td>TACOMA</td>
+      <td>WA</td>
+      <td>984053360</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>3678807</td>
+      <td>FERSTER, DAVID</td>
+      <td>WILMETTE</td>
+      <td>IL</td>
+      <td>600911553</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>3850042</td>
+      <td>FORDE, JAMES</td>
+      <td>TUSTIN</td>
+      <td>CA</td>
+      <td>927806320</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>3993057</td>
+      <td>FRIEDMAN, DONNA</td>
+      <td>MOUNT PLEASANT</td>
+      <td>SC</td>
+      <td>294644305</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>3997846</td>
+      <td>FRIEDMAN, RANDOLPH</td>
+      <td>MOUNT PLEASANT</td>
+      <td>SC</td>
+      <td>294644305</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>4293837</td>
+      <td>GILBERT, JOHN</td>
+      <td>BROOKLINE</td>
+      <td>MA</td>
+      <td>024465769</td>
+      <td>[2004, 2006, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>4336953</td>
+      <td>GIRARDI, THOMAS V.</td>
+      <td>LOS ANGELES</td>
+      <td>CA</td>
+      <td>900171904</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>13</td>
+      <td>4435025</td>
+      <td>GOLLON, PETER</td>
+      <td>HUNTINGTON</td>
+      <td>NY</td>
+      <td>117431918</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>14</td>
+      <td>4684620</td>
+      <td>GROSSBLATT, DAVID</td>
+      <td>SAN FRANCISCO</td>
+      <td>CA</td>
+      <td>941074317</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>15</td>
+      <td>4745356</td>
+      <td>GURAL, JEFFREY</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>100175529</td>
+      <td>[2004, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>16</td>
+      <td>4828088</td>
+      <td>HALL, CLAIRE</td>
+      <td>VICTOR</td>
+      <td>NY</td>
+      <td>145641102</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>17</td>
+      <td>5486301</td>
+      <td>HONARKAR, MOHAMMAD</td>
+      <td>IRVINE</td>
+      <td>CA</td>
+      <td>926184236</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>18</td>
+      <td>5515167</td>
+      <td>HORLICK, SUSAN</td>
+      <td>TALLAHASSEE</td>
+      <td>FL</td>
+      <td>323117834</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>19</td>
+      <td>5601495</td>
+      <td>HUDSON, BRUCE S.</td>
+      <td>SYRACUSE</td>
+      <td>NY</td>
+      <td>132103116</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>20</td>
+      <td>5870457</td>
+      <td>JENCKS, CHRISTOPHER</td>
+      <td>CAMBRIDGE</td>
+      <td>MA</td>
+      <td>021382409</td>
+      <td>[2004, 2006, 2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>21</td>
+      <td>5902719</td>
+      <td>JHONG, EUGENE</td>
+      <td>LOS ALTOS</td>
+      <td>CA</td>
+      <td>940221702</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>22</td>
+      <td>6110433</td>
+      <td>KAHN, RONALD N</td>
+      <td>SAN FRANCISCO</td>
+      <td>CA</td>
+      <td>941590599</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>23</td>
+      <td>6147085</td>
+      <td>KAPER, TASSO</td>
+      <td>MANCHESTER</td>
+      <td>MA</td>
+      <td>019441048</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>24</td>
+      <td>6169689</td>
+      <td>KARPLUS, BARBARA</td>
+      <td>NEWBURY PARK</td>
+      <td>CA</td>
+      <td>913202803</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>25</td>
+      <td>6433238</td>
+      <td>KIRK, CLAY</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>100215251</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>26</td>
+      <td>6822374</td>
+      <td>LARSEN, CHRIS</td>
+      <td>SAN FRANCISCO</td>
+      <td>CA</td>
+      <td>941091512</td>
+      <td>[2010, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>27</td>
+      <td>6872845</td>
+      <td>LAWRENCE, FRANK</td>
+      <td>LEES SUMMIT</td>
+      <td>MO</td>
+      <td>640863079</td>
+      <td>[2016, 2020]</td>
+    </tr>
+    <tr>
+      <td>28</td>
+      <td>7037936</td>
+      <td>LEVINSON, FRANK</td>
+      <td>TIBURON</td>
+      <td>CA</td>
+      <td>949202523</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>29</td>
+      <td>7863787</td>
+      <td>MCEVOY, NION</td>
+      <td>SAN FRANCISCO</td>
+      <td>CA</td>
+      <td>94118</td>
+      <td>[2002, 2004, 2006, 2008, 2010, 2012, 2014, 201...</td>
+    </tr>
+    <tr>
+      <td>30</td>
+      <td>8417423</td>
+      <td>MORGAN, HOWARD L.</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>100657253</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>31</td>
+      <td>8496236</td>
+      <td>MOUNT, PHYLLIS F.</td>
+      <td>SOUTHBURY</td>
+      <td>CT</td>
+      <td>064885719</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>32</td>
+      <td>8656333</td>
+      <td>NASH, RICHARD</td>
+      <td>MISSOULA</td>
+      <td>MT</td>
+      <td>598045862</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>33</td>
+      <td>8688914</td>
+      <td>NEGROPONTE, NICHOLAS</td>
+      <td>CAMBRIDGE</td>
+      <td>MA</td>
+      <td>021421322</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>34</td>
+      <td>8793106</td>
+      <td>NIELSEN, SHEILA</td>
+      <td>WINNETKA</td>
+      <td>IL</td>
+      <td>600932015</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>35</td>
+      <td>8848719</td>
+      <td>NORTON, JACK</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>10027</td>
+      <td>[2010, 2012, 2014, 2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>36</td>
+      <td>9165471</td>
+      <td>PARK, DAVID</td>
+      <td>LOS ALTOS</td>
+      <td>CA</td>
+      <td>940223838</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>37</td>
+      <td>9188602</td>
+      <td>PARK, TODD</td>
+      <td>LOS ALTOS HILLS</td>
+      <td>CA</td>
+      <td>940223385</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>38</td>
+      <td>9625220</td>
+      <td>POWERS, ANN</td>
+      <td>DUNSMUIR</td>
+      <td>CA</td>
+      <td>960252504</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>39</td>
+      <td>9683572</td>
+      <td>PROCKOP, DARWIN J. MD, PHD</td>
+      <td>PHILADELPHIA</td>
+      <td>PA</td>
+      <td>191063913</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>40</td>
+      <td>9688035</td>
+      <td>PROOPS, JAY</td>
+      <td>OVANDO</td>
+      <td>MT</td>
+      <td>598540149</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>41</td>
+      <td>10325529</td>
+      <td>ROSZAK, MATTHEW</td>
+      <td>WINNETKA</td>
+      <td>IL</td>
+      <td>600933630</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>42</td>
+      <td>10979072</td>
+      <td>SHENKER, SCOTT</td>
+      <td>BERKELEY</td>
+      <td>CA</td>
+      <td>947072052</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>43</td>
+      <td>11024692</td>
+      <td>SHOCH, JOHN PHD</td>
+      <td>WOODSIDE</td>
+      <td>CA</td>
+      <td>940622538</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>44</td>
+      <td>11356137</td>
+      <td>SOLIMAN, KARL</td>
+      <td>IRVINE</td>
+      <td>CA</td>
+      <td>926127186</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>45</td>
+      <td>11659801</td>
+      <td>STOREY, BAYARD T PH.D.</td>
+      <td>PHILADELPHIA</td>
+      <td>PA</td>
+      <td>191303202</td>
+      <td>[2006, 2014, 2016]</td>
+    </tr>
+    <tr>
+      <td>46</td>
+      <td>11823232</td>
+      <td>SWINDELL, DAVE</td>
+      <td>BOSTON</td>
+      <td>MA</td>
+      <td>021163510</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>47</td>
+      <td>11902785</td>
+      <td>TAYLOR, DALE</td>
+      <td>CHICAGO</td>
+      <td>IL</td>
+      <td>606146085</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>48</td>
+      <td>12143213</td>
+      <td>TORRES, TOMAS</td>
+      <td>HOUSTON</td>
+      <td>TX</td>
+      <td>770653124</td>
+      <td>[2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>49</td>
+      <td>12265351</td>
+      <td>TUSK, BRADLEY</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>100039605</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Create-ctx_indiv">Create <code>ctx_indiv</code><a class="anchor-link" href="#Create-ctx_indiv">&#182;</a></h3>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[17]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+create or replace view ctx_indiv as
+select i.*
+  from ctx_donor dx
+  join indiv i on i.donor_indiv_id = dx.id
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[17]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Note, there will likely be more Individuals in the context (compared to Donors above) due to the coalesce logic in <code>indiv_group</code>.  Individual records that are combined to form a Donor should be adjacent to each other here.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[18]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select id,
+       name,
+       city,
+       state,
+       zip_code,
+       elect_cycles,
+       donor_indiv_id
+  from ctx_indiv
+ order by donor_indiv_id, name
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+54 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[18]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>id</th>
+      <th>name</th>
+      <th>city</th>
+      <th>state</th>
+      <th>zip_code</th>
+      <th>elect_cycles</th>
+      <th>donor_indiv_id</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>28429</td>
+      <td>ABRAMSON, RONALD</td>
+      <td>WASHINGTON</td>
+      <td>DC</td>
+      <td>200063807</td>
+      <td>[2012, 2014, 2016, 2018, 2020]</td>
+      <td>28429</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>678448</td>
+      <td>BASSI, STEVE</td>
+      <td>CARLSBAD</td>
+      <td>CA</td>
+      <td>920081900</td>
+      <td>[2018]</td>
+      <td>678448</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>779629</td>
+      <td>BEEUWKES, REINIER</td>
+      <td>CONCORD</td>
+      <td>MA</td>
+      <td>017425322</td>
+      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
+      <td>779629</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>877907</td>
+      <td>BERG, FRED</td>
+      <td>CUSHING</td>
+      <td>ME</td>
+      <td>045633307</td>
+      <td>[2016, 2018]</td>
+      <td>877907</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>1083690</td>
+      <td>BLUE, ALLEN</td>
+      <td>VENICE</td>
+      <td>CA</td>
+      <td>902913830</td>
+      <td>[2016, 2018]</td>
+      <td>1083690</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>1661575</td>
+      <td>BYERS, BROOK</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940257020</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>1661575</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>2576925</td>
+      <td>CUELLAR, CLIFFORD</td>
+      <td>TACOMA</td>
+      <td>WA</td>
+      <td>984053360</td>
+      <td>[2016, 2018, 2020]</td>
+      <td>2576925</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>3678807</td>
+      <td>FERSTER, DAVID</td>
+      <td>WILMETTE</td>
+      <td>IL</td>
+      <td>600911553</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>3678807</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>3850042</td>
+      <td>FORDE, JAMES</td>
+      <td>TUSTIN</td>
+      <td>CA</td>
+      <td>927806320</td>
+      <td>[2018]</td>
+      <td>3850042</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>3993057</td>
+      <td>FRIEDMAN, DONNA</td>
+      <td>MOUNT PLEASANT</td>
+      <td>SC</td>
+      <td>294644305</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>3993057</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>3997846</td>
+      <td>FRIEDMAN, RANDOLPH</td>
+      <td>MOUNT PLEASANT</td>
+      <td>SC</td>
+      <td>294644305</td>
+      <td>[2018, 2020]</td>
+      <td>3997846</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>4293837</td>
+      <td>GILBERT, JOHN</td>
+      <td>BROOKLINE</td>
+      <td>MA</td>
+      <td>024465769</td>
+      <td>[2004, 2006, 2014, 2016, 2018, 2020]</td>
+      <td>4293837</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>4336953</td>
+      <td>GIRARDI, THOMAS V.</td>
+      <td>LOS ANGELES</td>
+      <td>CA</td>
+      <td>900171904</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>4336953</td>
+    </tr>
+    <tr>
+      <td>13</td>
+      <td>4435025</td>
+      <td>GOLLON, PETER</td>
+      <td>HUNTINGTON</td>
+      <td>NY</td>
+      <td>117431918</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>4435025</td>
+    </tr>
+    <tr>
+      <td>14</td>
+      <td>4684620</td>
+      <td>GROSSBLATT, DAVID</td>
+      <td>SAN FRANCISCO</td>
+      <td>CA</td>
+      <td>941074317</td>
+      <td>[2018]</td>
+      <td>4684620</td>
+    </tr>
+    <tr>
+      <td>15</td>
+      <td>4745356</td>
+      <td>GURAL, JEFFREY</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>100175529</td>
+      <td>[2004, 2014, 2016, 2018, 2020]</td>
+      <td>4745356</td>
+    </tr>
+    <tr>
+      <td>16</td>
+      <td>4828088</td>
+      <td>HALL, CLAIRE</td>
+      <td>VICTOR</td>
+      <td>NY</td>
+      <td>145641102</td>
+      <td>[2018]</td>
+      <td>4828088</td>
+    </tr>
+    <tr>
+      <td>17</td>
+      <td>5486301</td>
+      <td>HONARKAR, MOHAMMAD</td>
+      <td>IRVINE</td>
+      <td>CA</td>
+      <td>926184236</td>
+      <td>[2016, 2018]</td>
+      <td>5486301</td>
+    </tr>
+    <tr>
+      <td>18</td>
+      <td>5515167</td>
+      <td>HORLICK, SUSAN</td>
+      <td>TALLAHASSEE</td>
+      <td>FL</td>
+      <td>323117834</td>
+      <td>[2016, 2018, 2020]</td>
+      <td>5515167</td>
+    </tr>
+    <tr>
+      <td>19</td>
+      <td>5601495</td>
+      <td>HUDSON, BRUCE S.</td>
+      <td>SYRACUSE</td>
+      <td>NY</td>
+      <td>132103116</td>
+      <td>[2016]</td>
+      <td>5601495</td>
+    </tr>
+    <tr>
+      <td>20</td>
+      <td>5870457</td>
+      <td>JENCKS, CHRISTOPHER</td>
+      <td>CAMBRIDGE</td>
+      <td>MA</td>
+      <td>021382409</td>
+      <td>[2004, 2006, 2012, 2014, 2016, 2018, 2020]</td>
+      <td>5870457</td>
+    </tr>
+    <tr>
+      <td>21</td>
+      <td>5902719</td>
+      <td>JHONG, EUGENE</td>
+      <td>LOS ALTOS</td>
+      <td>CA</td>
+      <td>940221702</td>
+      <td>[2018, 2020]</td>
+      <td>5902719</td>
+    </tr>
+    <tr>
+      <td>22</td>
+      <td>6110433</td>
+      <td>KAHN, RONALD N</td>
+      <td>SAN FRANCISCO</td>
+      <td>CA</td>
+      <td>941590599</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>6110433</td>
+    </tr>
+    <tr>
+      <td>23</td>
+      <td>6110440</td>
+      <td>KAHN, RONALD N.</td>
+      <td>SAN FRANCISCO</td>
+      <td>CA</td>
+      <td>941590599</td>
+      <td>[2016, 2018, 2020]</td>
+      <td>6110433</td>
+    </tr>
+    <tr>
+      <td>24</td>
+      <td>6147085</td>
+      <td>KAPER, TASSO</td>
+      <td>MANCHESTER</td>
+      <td>MA</td>
+      <td>019441048</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>6147085</td>
+    </tr>
+    <tr>
+      <td>25</td>
+      <td>6169689</td>
+      <td>KARPLUS, BARBARA</td>
+      <td>NEWBURY PARK</td>
+      <td>CA</td>
+      <td>913202803</td>
+      <td>[2016, 2018, 2020]</td>
+      <td>6169689</td>
+    </tr>
+    <tr>
+      <td>26</td>
+      <td>6433238</td>
+      <td>KIRK, CLAY</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>100215251</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>6433238</td>
+    </tr>
+    <tr>
+      <td>27</td>
+      <td>6433258</td>
+      <td>KIRK, CLAY KENAN</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>100215251</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>6433238</td>
+    </tr>
+    <tr>
+      <td>28</td>
+      <td>6822374</td>
+      <td>LARSEN, CHRIS</td>
+      <td>SAN FRANCISCO</td>
+      <td>CA</td>
+      <td>941091512</td>
+      <td>[2010, 2016, 2018, 2020]</td>
+      <td>6822374</td>
+    </tr>
+    <tr>
+      <td>29</td>
+      <td>6872845</td>
+      <td>LAWRENCE, FRANK</td>
+      <td>LEES SUMMIT</td>
+      <td>MO</td>
+      <td>640863079</td>
+      <td>[2016, 2020]</td>
+      <td>6872845</td>
+    </tr>
+    <tr>
+      <td>30</td>
+      <td>7037936</td>
+      <td>LEVINSON, FRANK</td>
+      <td>TIBURON</td>
+      <td>CA</td>
+      <td>949202523</td>
+      <td>[2016, 2018, 2020]</td>
+      <td>7037936</td>
+    </tr>
+    <tr>
+      <td>31</td>
+      <td>7863787</td>
+      <td>MCEVOY, NION</td>
+      <td>SAN FRANCISCO</td>
+      <td>CA</td>
+      <td>94118</td>
+      <td>[2002, 2004, 2006, 2008, 2010, 2012, 2014, 201...</td>
+      <td>7863787</td>
+    </tr>
+    <tr>
+      <td>32</td>
+      <td>8417423</td>
+      <td>MORGAN, HOWARD L.</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>100657253</td>
+      <td>[2018]</td>
+      <td>8417423</td>
+    </tr>
+    <tr>
+      <td>33</td>
+      <td>8496236</td>
+      <td>MOUNT, PHYLLIS F.</td>
+      <td>SOUTHBURY</td>
+      <td>CT</td>
+      <td>064885719</td>
+      <td>[2018, 2020]</td>
+      <td>8496236</td>
+    </tr>
+    <tr>
+      <td>34</td>
+      <td>8656333</td>
+      <td>NASH, RICHARD</td>
+      <td>MISSOULA</td>
+      <td>MT</td>
+      <td>598045862</td>
+      <td>[2018]</td>
+      <td>8656333</td>
+    </tr>
+    <tr>
+      <td>35</td>
+      <td>8688914</td>
+      <td>NEGROPONTE, NICHOLAS</td>
+      <td>CAMBRIDGE</td>
+      <td>MA</td>
+      <td>021421322</td>
+      <td>[2018]</td>
+      <td>8688914</td>
+    </tr>
+    <tr>
+      <td>36</td>
+      <td>8793106</td>
+      <td>NIELSEN, SHEILA</td>
+      <td>WINNETKA</td>
+      <td>IL</td>
+      <td>600932015</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>8793106</td>
+    </tr>
+    <tr>
+      <td>37</td>
+      <td>8848719</td>
+      <td>NORTON, JACK</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>10027</td>
+      <td>[2010, 2012, 2014, 2016, 2018]</td>
+      <td>8848719</td>
+    </tr>
+    <tr>
+      <td>38</td>
+      <td>8848720</td>
+      <td>NORTON, JACK</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>100276814</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>8848719</td>
+    </tr>
+    <tr>
+      <td>39</td>
+      <td>8848731</td>
+      <td>NORTON, JACK R.</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>10027</td>
+      <td>[2012, 2018]</td>
+      <td>8848719</td>
+    </tr>
+    <tr>
+      <td>40</td>
+      <td>9165471</td>
+      <td>PARK, DAVID</td>
+      <td>LOS ALTOS</td>
+      <td>CA</td>
+      <td>940223838</td>
+      <td>[2018]</td>
+      <td>9165471</td>
+    </tr>
+    <tr>
+      <td>41</td>
+      <td>9188602</td>
+      <td>PARK, TODD</td>
+      <td>LOS ALTOS HILLS</td>
+      <td>CA</td>
+      <td>940223385</td>
+      <td>[2018, 2020]</td>
+      <td>9188602</td>
+    </tr>
+    <tr>
+      <td>42</td>
+      <td>9625220</td>
+      <td>POWERS, ANN</td>
+      <td>DUNSMUIR</td>
+      <td>CA</td>
+      <td>960252504</td>
+      <td>[2016, 2018]</td>
+      <td>9625220</td>
+    </tr>
+    <tr>
+      <td>43</td>
+      <td>9683572</td>
+      <td>PROCKOP, DARWIN J. MD, PHD</td>
+      <td>PHILADELPHIA</td>
+      <td>PA</td>
+      <td>191063913</td>
+      <td>[2016, 2018]</td>
+      <td>9683572</td>
+    </tr>
+    <tr>
+      <td>44</td>
+      <td>9688035</td>
+      <td>PROOPS, JAY</td>
+      <td>OVANDO</td>
+      <td>MT</td>
+      <td>598540149</td>
+      <td>[2018]</td>
+      <td>9688035</td>
+    </tr>
+    <tr>
+      <td>45</td>
+      <td>10325529</td>
+      <td>ROSZAK, MATTHEW</td>
+      <td>WINNETKA</td>
+      <td>IL</td>
+      <td>600933630</td>
+      <td>[2018, 2020]</td>
+      <td>10325529</td>
+    </tr>
+    <tr>
+      <td>46</td>
+      <td>10979072</td>
+      <td>SHENKER, SCOTT</td>
+      <td>BERKELEY</td>
+      <td>CA</td>
+      <td>947072052</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>10979072</td>
+    </tr>
+    <tr>
+      <td>47</td>
+      <td>11024692</td>
+      <td>SHOCH, JOHN PHD</td>
+      <td>WOODSIDE</td>
+      <td>CA</td>
+      <td>940622538</td>
+      <td>[2016, 2018]</td>
+      <td>11024692</td>
+    </tr>
+    <tr>
+      <td>48</td>
+      <td>11356137</td>
+      <td>SOLIMAN, KARL</td>
+      <td>IRVINE</td>
+      <td>CA</td>
+      <td>926127186</td>
+      <td>[2018]</td>
+      <td>11356137</td>
+    </tr>
+    <tr>
+      <td>49</td>
+      <td>11659801</td>
+      <td>STOREY, BAYARD T PH.D.</td>
+      <td>PHILADELPHIA</td>
+      <td>PA</td>
+      <td>191303202</td>
+      <td>[2006, 2014, 2016]</td>
+      <td>11659801</td>
+    </tr>
+    <tr>
+      <td>50</td>
+      <td>11823232</td>
+      <td>SWINDELL, DAVE</td>
+      <td>BOSTON</td>
+      <td>MA</td>
+      <td>021163510</td>
+      <td>[2018]</td>
+      <td>11823232</td>
+    </tr>
+    <tr>
+      <td>51</td>
+      <td>11902785</td>
+      <td>TAYLOR, DALE</td>
+      <td>CHICAGO</td>
+      <td>IL</td>
+      <td>606146085</td>
+      <td>[2016, 2018, 2020]</td>
+      <td>11902785</td>
+    </tr>
+    <tr>
+      <td>52</td>
+      <td>12143213</td>
+      <td>TORRES, TOMAS</td>
+      <td>HOUSTON</td>
+      <td>TX</td>
+      <td>770653124</td>
+      <td>[2012, 2014, 2016, 2018, 2020]</td>
+      <td>12143213</td>
+    </tr>
+    <tr>
+      <td>53</td>
+      <td>12265351</td>
+      <td>TUSK, BRADLEY</td>
+      <td>NEW YORK</td>
+      <td>NY</td>
+      <td>100039605</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>12265351</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Create-ctx_indiv_contrib">Create <code>ctx_indiv_contrib</code><a class="anchor-link" href="#Create-ctx_indiv_contrib">&#182;</a></h3>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[19]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+create or replace view ctx_indiv_contrib as
+select ic.*
+  from ctx_indiv ix
+  join indiv_contrib ic on ic.indiv_id = ix.id
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[19]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[20]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -13824,7 +16656,7 @@ select count(*)             as contribs,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[7]:</div>
+    <div class="prompt output_prompt">Out[20]:</div>
 
 
 
@@ -13855,9 +16687,570 @@ select count(*)             as contribs,
   <tbody>
     <tr>
       <td>0</td>
-      <td>101</td>
-      <td>264450.00</td>
-      <td>[2000, 2002, 2004, 2006, 2008, 2010, 2012, 201...</td>
+      <td>4369</td>
+      <td>6663529.00</td>
+      <td>[2002, 2004, 2006, 2008, 2010, 2012, 2014, 201...</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Create-ctx_donor_contrib">Create <code>ctx_donor_contrib</code><a class="anchor-link" href="#Create-ctx_donor_contrib">&#182;</a></h3><p>This is really the same as <code>ctx_indiv_contrib</code>, except that we are adding <code>donor_indiv_id</code> on top of the <code>indiv_contrib</code> columns so that queries using this context view are able to join to (and/or group by) the underlying Donor record (and not just the Individual associated with the contribution record).</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[21]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+create or replace view ctx_donor_contrib as
+select ic.*,
+       ix.donor_indiv_id
+  from ctx_indiv ix
+  join indiv_contrib ic on ic.indiv_id = ix.id
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[21]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[22]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select d.id                 as donor_id,
+       d.name               as donor_name,
+       count(*)             as contribs,
+       sum(transaction_amt) as total_amt,
+       array_agg(distinct elect_cycle) as elect_cycles
+  from ctx_donor_contrib cx
+  join donor_indiv d on d.id = cx.donor_indiv_id
+ group by 1, 2
+ order by 4 desc, 3 desc
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+50 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[22]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>donor_id</th>
+      <th>donor_name</th>
+      <th>contribs</th>
+      <th>total_amt</th>
+      <th>elect_cycles</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>779629</td>
+      <td>BEEUWKES, REINIER</td>
+      <td>433</td>
+      <td>888258.00</td>
+      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>6169689</td>
+      <td>KARPLUS, BARBARA</td>
+      <td>340</td>
+      <td>878285.00</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>10979072</td>
+      <td>SHENKER, SCOTT</td>
+      <td>241</td>
+      <td>849800.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>28429</td>
+      <td>ABRAMSON, RONALD</td>
+      <td>295</td>
+      <td>471583.00</td>
+      <td>[2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>1083690</td>
+      <td>BLUE, ALLEN</td>
+      <td>81</td>
+      <td>426400.00</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>7863787</td>
+      <td>MCEVOY, NION</td>
+      <td>558</td>
+      <td>383899.00</td>
+      <td>[2002, 2004, 2006, 2008, 2010, 2012, 2014, 201...</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>11902785</td>
+      <td>TAYLOR, DALE</td>
+      <td>48</td>
+      <td>258050.00</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>4336953</td>
+      <td>GIRARDI, THOMAS V.</td>
+      <td>24</td>
+      <td>235100.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>6433238</td>
+      <td>KIRK, CLAY</td>
+      <td>98</td>
+      <td>211850.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>1661575</td>
+      <td>BYERS, BROOK</td>
+      <td>60</td>
+      <td>194900.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>9188602</td>
+      <td>PARK, TODD</td>
+      <td>26</td>
+      <td>155414.00</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>4745356</td>
+      <td>GURAL, JEFFREY</td>
+      <td>49</td>
+      <td>134500.00</td>
+      <td>[2004, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>6822374</td>
+      <td>LARSEN, CHRIS</td>
+      <td>26</td>
+      <td>115200.00</td>
+      <td>[2010, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>13</td>
+      <td>8793106</td>
+      <td>NIELSEN, SHEILA</td>
+      <td>474</td>
+      <td>113619.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>14</td>
+      <td>10325529</td>
+      <td>ROSZAK, MATTHEW</td>
+      <td>6</td>
+      <td>110181.00</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>15</td>
+      <td>6110433</td>
+      <td>KAHN, RONALD N</td>
+      <td>38</td>
+      <td>105600.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>16</td>
+      <td>8848719</td>
+      <td>NORTON, JACK</td>
+      <td>200</td>
+      <td>102475.00</td>
+      <td>[2010, 2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>17</td>
+      <td>5870457</td>
+      <td>JENCKS, CHRISTOPHER</td>
+      <td>309</td>
+      <td>102033.00</td>
+      <td>[2004, 2006, 2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>18</td>
+      <td>9683572</td>
+      <td>PROCKOP, DARWIN J. MD, PHD</td>
+      <td>3</td>
+      <td>102000.00</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>19</td>
+      <td>11659801</td>
+      <td>STOREY, BAYARD T PH.D.</td>
+      <td>16</td>
+      <td>91700.00</td>
+      <td>[2006, 2014, 2016]</td>
+    </tr>
+    <tr>
+      <td>20</td>
+      <td>4435025</td>
+      <td>GOLLON, PETER</td>
+      <td>169</td>
+      <td>87000.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>21</td>
+      <td>3993057</td>
+      <td>FRIEDMAN, DONNA</td>
+      <td>22</td>
+      <td>58550.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>22</td>
+      <td>8656333</td>
+      <td>NASH, RICHARD</td>
+      <td>5</td>
+      <td>58099.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>23</td>
+      <td>12143213</td>
+      <td>TORRES, TOMAS</td>
+      <td>128</td>
+      <td>58062.00</td>
+      <td>[2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>24</td>
+      <td>12265351</td>
+      <td>TUSK, BRADLEY</td>
+      <td>21</td>
+      <td>55600.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>25</td>
+      <td>4293837</td>
+      <td>GILBERT, JOHN</td>
+      <td>94</td>
+      <td>39225.00</td>
+      <td>[2004, 2006, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>26</td>
+      <td>9165471</td>
+      <td>PARK, DAVID</td>
+      <td>12</td>
+      <td>36345.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>27</td>
+      <td>3678807</td>
+      <td>FERSTER, DAVID</td>
+      <td>62</td>
+      <td>32058.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>28</td>
+      <td>7037936</td>
+      <td>LEVINSON, FRANK</td>
+      <td>43</td>
+      <td>31541.00</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>29</td>
+      <td>6147085</td>
+      <td>KAPER, TASSO</td>
+      <td>65</td>
+      <td>25109.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>30</td>
+      <td>11356137</td>
+      <td>SOLIMAN, KARL</td>
+      <td>9</td>
+      <td>25033.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>31</td>
+      <td>8417423</td>
+      <td>MORGAN, HOWARD L.</td>
+      <td>1</td>
+      <td>25000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>32</td>
+      <td>8688914</td>
+      <td>NEGROPONTE, NICHOLAS</td>
+      <td>7</td>
+      <td>21987.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>33</td>
+      <td>5515167</td>
+      <td>HORLICK, SUSAN</td>
+      <td>222</td>
+      <td>20670.00</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>34</td>
+      <td>5601495</td>
+      <td>HUDSON, BRUCE S.</td>
+      <td>11</td>
+      <td>17000.00</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>35</td>
+      <td>4684620</td>
+      <td>GROSSBLATT, DAVID</td>
+      <td>6</td>
+      <td>16033.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>36</td>
+      <td>3850042</td>
+      <td>FORDE, JAMES</td>
+      <td>4</td>
+      <td>13500.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>37</td>
+      <td>5486301</td>
+      <td>HONARKAR, MOHAMMAD</td>
+      <td>43</td>
+      <td>11950.00</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>38</td>
+      <td>11024692</td>
+      <td>SHOCH, JOHN PHD</td>
+      <td>2</td>
+      <td>11000.00</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>39</td>
+      <td>2576925</td>
+      <td>CUELLAR, CLIFFORD</td>
+      <td>54</td>
+      <td>10584.00</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>40</td>
+      <td>9688035</td>
+      <td>PROOPS, JAY</td>
+      <td>2</td>
+      <td>10250.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>41</td>
+      <td>678448</td>
+      <td>BASSI, STEVE</td>
+      <td>1</td>
+      <td>10233.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>42</td>
+      <td>6872845</td>
+      <td>LAWRENCE, FRANK</td>
+      <td>11</td>
+      <td>10165.00</td>
+      <td>[2016, 2020]</td>
+    </tr>
+    <tr>
+      <td>43</td>
+      <td>11823232</td>
+      <td>SWINDELL, DAVE</td>
+      <td>2</td>
+      <td>10000.00</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>44</td>
+      <td>5902719</td>
+      <td>JHONG, EUGENE</td>
+      <td>8</td>
+      <td>8802.00</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>45</td>
+      <td>3997846</td>
+      <td>FRIEDMAN, RANDOLPH</td>
+      <td>2</td>
+      <td>7700.00</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>46</td>
+      <td>877907</td>
+      <td>BERG, FRED</td>
+      <td>17</td>
+      <td>6005.00</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>47</td>
+      <td>9625220</td>
+      <td>POWERS, ANN</td>
+      <td>13</td>
+      <td>5110.00</td>
+      <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>48</td>
+      <td>8496236</td>
+      <td>MOUNT, PHYLLIS F.</td>
+      <td>6</td>
+      <td>5071.00</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>49</td>
+      <td>4828088</td>
+      <td>HALL, CLAIRE</td>
+      <td>2</td>
+      <td>5000.00</td>
+      <td>[2018]</td>
     </tr>
   </tbody>
 </table>

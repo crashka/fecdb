@@ -2,7 +2,7 @@
 <html>
 <head><meta charset="utf-8" />
 
-<title>dc2_ctx_indiv_multi_person</title>
+<title>qc4_ctx_donor_contrib</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
@@ -13077,18 +13077,7 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h1>Define Individual Context &ndash; Multi-Person Use Case</h1>
-<h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Explore the FEC data by specifying SQL predicates that identify <strong>Individuals</strong>, which are people identities extracted&mdash;and somewhat cleansed&mdash;from the <a href="https://www.fec.gov/campaign-finance-data/contributions-individuals-file-description/">Individual Contributions</a> file.  Inidividual records (stored in the <code>indiv</code> table), are basically distinct combinations of name and address information (city, state, zipcode) that have not been aggressively deduplicated.  Thus, there will be multiple records for a real-world person if there are variants (or typos or deception) in the identifying information for contribution records.</p>
-<p>Querying by Individual can be used to target all of the <code>indiv</code> records (and associated contribution data in <code>indiv_contrib</code>) for a single person, or for a set of people to be explored collectively.  An example of the second usage will be presented here (the first is covered in the preceding <code>dc1</code> notebook).  One of the limitation of Querying by Individual is that it is difficult to distinguish between the contribution of distinct people identities within a result set.</p>
-<p>Note that this approach will create the following query contexts (each of which may be used in formulating specific queries for investigation or reporting):</p>
-<p><strong>Principal Context View</strong></p>
-<ul>
-<li><code>ctx_indiv</code></li>
-</ul>
-<p><strong>Dependent Context Views</strong></p>
-<ul>
-<li><code>ctx_indiv_contrib</code></li>
-</ul>
+<h1 id="Query-by-Donor-Contribution-Context">Query by Donor Contribution Context<a class="anchor-link" href="#Query-by-Donor-Contribution-Context">&#182;</a></h1><h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Query based on <code>ctx_donor_contrib</code> view</p>
 
 </div>
 </div>
@@ -13147,112 +13136,13 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Clear-context">Clear context<a class="anchor-link" href="#Clear-context">&#182;</a></h3><p>Note that we drop <em>all</em> context views so we won't have any inconsistencies after this notebook is run.  After defining <code>ctx_indiv</code> below, we will define all dependent views (see Overview, above), and leave any higher-order or orthogonal views undefined</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[2]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg_memb     cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg          cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_donor_contrib cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_donor         cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_household     cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg_memb     cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg          cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_indiv_contrib cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_indiv         cascade
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[2]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
 <h3 id="Set-styling">Set styling<a class="anchor-link" href="#Set-styling">&#182;</a></h3>
 </div>
 </div>
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[3]:</div>
+<div class="prompt input_prompt">In&nbsp;[2]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%html</span>
@@ -13295,22 +13185,18 @@ Done.
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Create-Principal-View-(ctx_indiv)">Create Principal View (<code>ctx_indiv</code>)<a class="anchor-link" href="#Create-Principal-View-(ctx_indiv)">&#182;</a></h2><p>For this use case, we'll identify the <code>indiv</code> records associated with the household (multiple people) previously queried (in <code>el_queries1.sql</code> and <code>el_queries3.sql</code>)</p>
-
+<h2 id="Validate-Context">Validate Context<a class="anchor-link" href="#Validate-Context">&#182;</a></h2>
 </div>
 </div>
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[4]:</div>
+<div class="prompt input_prompt">In&nbsp;[3]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_indiv as
-select *
-  from indiv
- where name like &#39;SANDELL, %&#39;
-   and zip_code ~ &#39;9402[58]&#39;
+select count(*)
+  from ctx_donor_contrib
 </pre></div>
 
     </div>
@@ -13328,7 +13214,102 @@ select *
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
+1 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[3]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>count</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>4369</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Queries-/-Use-Cases">Queries / Use Cases<a class="anchor-link" href="#Queries-/-Use-Cases">&#182;</a></h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Contribution-Summary-by-Election-Cycle">Contribution Summary by Election Cycle<a class="anchor-link" href="#Contribution-Summary-by-Election-Cycle">&#182;</a></h3>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[4]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select dcx.elect_cycle,
+       count(*) cycle_contribs,
+       sum(dcx.transaction_amt) cycle_amount,
+       round(avg(dcx.transaction_amt), 2) avg_amount,
+       min(dcx.transaction_amt) min_amount,
+       max(dcx.transaction_amt) max_amount
+  from ctx_donor_contrib dcx
+ group by 1
+ order by 1
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+10 rows affected.
 </pre>
 </div>
 </div>
@@ -13358,9 +13339,105 @@ Done.
   <thead>
     <tr style="text-align: right;">
       <th></th>
+      <th>elect_cycle</th>
+      <th>cycle_contribs</th>
+      <th>cycle_amount</th>
+      <th>avg_amount</th>
+      <th>min_amount</th>
+      <th>max_amount</th>
     </tr>
   </thead>
   <tbody>
+    <tr>
+      <td>0</td>
+      <td>2002</td>
+      <td>5</td>
+      <td>3500.00</td>
+      <td>700.00</td>
+      <td>250.00</td>
+      <td>1000.00</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>2004</td>
+      <td>8</td>
+      <td>31000.00</td>
+      <td>3875.00</td>
+      <td>500.00</td>
+      <td>25000.00</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>2006</td>
+      <td>17</td>
+      <td>14200.00</td>
+      <td>835.29</td>
+      <td>200.00</td>
+      <td>2000.00</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>2008</td>
+      <td>22</td>
+      <td>13100.00</td>
+      <td>595.45</td>
+      <td>200.00</td>
+      <td>2300.00</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>2010</td>
+      <td>18</td>
+      <td>12250.00</td>
+      <td>680.56</td>
+      <td>250.00</td>
+      <td>2500.00</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>2012</td>
+      <td>19</td>
+      <td>21000.00</td>
+      <td>1105.26</td>
+      <td>250.00</td>
+      <td>10000.00</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>2014</td>
+      <td>322</td>
+      <td>635002.00</td>
+      <td>1972.06</td>
+      <td>-2600.00</td>
+      <td>100000.00</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>2016</td>
+      <td>1066</td>
+      <td>1493514.00</td>
+      <td>1401.05</td>
+      <td>-2700.00</td>
+      <td>73175.00</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>2018</td>
+      <td>2563</td>
+      <td>3892299.00</td>
+      <td>1518.65</td>
+      <td>-2744.00</td>
+      <td>102281.00</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>2020</td>
+      <td>329</td>
+      <td>547664.00</td>
+      <td>1664.63</td>
+      <td>-2800.00</td>
+      <td>50000.00</td>
+    </tr>
   </tbody>
 </table>
 </div>
@@ -13375,8 +13452,7 @@ Done.
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Let's take a quick look at the context we just set (for validation) before proceeding</p>
-
+<h3 id="Top-Contributors-across-Election-Cycles">Top Contributors across Election Cycles<a class="anchor-link" href="#Top-Contributors-across-Election-Cycles">&#182;</a></h3>
 </div>
 </div>
 </div>
@@ -13386,13 +13462,19 @@ Done.
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select id,
-       name,
-       city,
-       state,
-       zip_code,
-       elect_cycles
-  from ctx_indiv
+select d.id as donor_id,
+       d.name as donor_name,
+       count(*) contribs,
+       sum(dcx.transaction_amt) total_amount,
+       round(avg(dcx.transaction_amt), 2) avg_amount,
+       max(dcx.transaction_amt) max_amount,
+       array_agg(distinct dcx.elect_cycle) as elect_cycles,
+       round(sum(dcx.transaction_amt) / count(distinct dcx.elect_cycle), 2) avg_cycle_amount
+  from ctx_donor_contrib dcx
+  join donor_indiv d on d.id = dcx.donor_indiv_id
+ group by 1, 2
+ order by 4 desc
+ limit 50
 </pre></div>
 
     </div>
@@ -13410,7 +13492,7 @@ select id,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-27 rows affected.
+50 rows affected.
 </pre>
 </div>
 </div>
@@ -13440,257 +13522,566 @@ select id,
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>id</th>
-      <th>name</th>
-      <th>city</th>
-      <th>state</th>
-      <th>zip_code</th>
+      <th>donor_id</th>
+      <th>donor_name</th>
+      <th>contribs</th>
+      <th>total_amount</th>
+      <th>avg_amount</th>
+      <th>max_amount</th>
       <th>elect_cycles</th>
+      <th>avg_cycle_amount</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>0</td>
-      <td>10527369</td>
-      <td>SANDELL, JENNIFER A MS.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004]</td>
+      <td>779629</td>
+      <td>BEEUWKES, REINIER</td>
+      <td>433</td>
+      <td>888258.00</td>
+      <td>2051.40</td>
+      <td>100000.00</td>
+      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
+      <td>111032.25</td>
     </tr>
     <tr>
       <td>1</td>
-      <td>10527363</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004, 2006, 2008, 2010]</td>
+      <td>6169689</td>
+      <td>KARPLUS, BARBARA</td>
+      <td>340</td>
+      <td>878285.00</td>
+      <td>2583.19</td>
+      <td>73175.00</td>
+      <td>[2016, 2018, 2020]</td>
+      <td>292761.67</td>
     </tr>
     <tr>
       <td>2</td>
-      <td>10527371</td>
-      <td>SANDELL, JENNIFER MS.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004]</td>
+      <td>10979072</td>
+      <td>SHENKER, SCOTT</td>
+      <td>241</td>
+      <td>849800.00</td>
+      <td>3526.14</td>
+      <td>50000.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>212450.00</td>
     </tr>
     <tr>
       <td>3</td>
-      <td>10527368</td>
-      <td>SANDELL, JENNIFER A</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2006, 2008]</td>
+      <td>28429</td>
+      <td>ABRAMSON, RONALD</td>
+      <td>295</td>
+      <td>471583.00</td>
+      <td>1598.59</td>
+      <td>33400.00</td>
+      <td>[2012, 2014, 2016, 2018, 2020]</td>
+      <td>94316.60</td>
     </tr>
     <tr>
       <td>4</td>
-      <td>10527370</td>
-      <td>SANDELL, JENNIFER AYER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004, 2010]</td>
+      <td>1083690</td>
+      <td>BLUE, ALLEN</td>
+      <td>81</td>
+      <td>426400.00</td>
+      <td>5264.20</td>
+      <td>33900.00</td>
+      <td>[2016, 2018]</td>
+      <td>213200.00</td>
     </tr>
     <tr>
       <td>5</td>
-      <td>10527364</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940250</td>
-      <td>[2004]</td>
+      <td>7863787</td>
+      <td>MCEVOY, NION</td>
+      <td>558</td>
+      <td>383899.00</td>
+      <td>687.99</td>
+      <td>50000.00</td>
+      <td>[2002, 2004, 2006, 2008, 2010, 2012, 2014, 201...</td>
+      <td>38389.90</td>
     </tr>
     <tr>
       <td>6</td>
-      <td>10527366</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
+      <td>11902785</td>
+      <td>TAYLOR, DALE</td>
+      <td>48</td>
+      <td>258050.00</td>
+      <td>5376.04</td>
+      <td>66100.00</td>
       <td>[2016, 2018, 2020]</td>
+      <td>86016.67</td>
     </tr>
     <tr>
       <td>7</td>
-      <td>10527365</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2018]</td>
+      <td>4336953</td>
+      <td>GIRARDI, THOMAS V.</td>
+      <td>24</td>
+      <td>235100.00</td>
+      <td>9795.83</td>
+      <td>100000.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>58775.00</td>
     </tr>
     <tr>
       <td>8</td>
-      <td>10527440</td>
-      <td>SANDELL, SCOTT D.</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2016]</td>
+      <td>6433238</td>
+      <td>KIRK, CLAY</td>
+      <td>98</td>
+      <td>211850.00</td>
+      <td>2161.73</td>
+      <td>20000.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>52962.50</td>
     </tr>
     <tr>
       <td>9</td>
-      <td>10527433</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004, 2006, 2008, 2010]</td>
+      <td>1661575</td>
+      <td>BYERS, BROOK</td>
+      <td>60</td>
+      <td>194900.00</td>
+      <td>3248.33</td>
+      <td>25000.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>48725.00</td>
     </tr>
     <tr>
       <td>10</td>
-      <td>10527447</td>
-      <td>SANDELL, SCOTT MRS.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004]</td>
+      <td>9188602</td>
+      <td>PARK, TODD</td>
+      <td>26</td>
+      <td>155414.00</td>
+      <td>5977.46</td>
+      <td>100000.00</td>
+      <td>[2018, 2020]</td>
+      <td>77707.00</td>
     </tr>
     <tr>
       <td>11</td>
-      <td>10527430</td>
-      <td>SANDELL, SCOTT</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2016, 2018, 2020]</td>
+      <td>4745356</td>
+      <td>GURAL, JEFFREY</td>
+      <td>49</td>
+      <td>134500.00</td>
+      <td>2744.90</td>
+      <td>10000.00</td>
+      <td>[2004, 2014, 2016, 2018, 2020]</td>
+      <td>26900.00</td>
     </tr>
     <tr>
       <td>12</td>
-      <td>10527429</td>
-      <td>SANDELL, SCOTT</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2000, 2008, 2010, 2012, 2016]</td>
+      <td>6822374</td>
+      <td>LARSEN, CHRIS</td>
+      <td>26</td>
+      <td>115200.00</td>
+      <td>4430.77</td>
+      <td>25000.00</td>
+      <td>[2010, 2016, 2018, 2020]</td>
+      <td>28800.00</td>
     </tr>
     <tr>
       <td>13</td>
-      <td>10527435</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2016]</td>
+      <td>8793106</td>
+      <td>NIELSEN, SHEILA</td>
+      <td>474</td>
+      <td>113619.00</td>
+      <td>239.70</td>
+      <td>10000.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>28404.75</td>
     </tr>
     <tr>
       <td>14</td>
-      <td>10527437</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2016]</td>
+      <td>10325529</td>
+      <td>ROSZAK, MATTHEW</td>
+      <td>6</td>
+      <td>110181.00</td>
+      <td>18363.50</td>
+      <td>102281.00</td>
+      <td>[2018, 2020]</td>
+      <td>55090.50</td>
     </tr>
     <tr>
       <td>15</td>
-      <td>10527445</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2018]</td>
+      <td>6110433</td>
+      <td>KAHN, RONALD N</td>
+      <td>38</td>
+      <td>105600.00</td>
+      <td>2778.95</td>
+      <td>5000.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>26400.00</td>
     </tr>
     <tr>
       <td>16</td>
-      <td>10527438</td>
-      <td>SANDELL, SCOTT D.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2010]</td>
+      <td>8848719</td>
+      <td>NORTON, JACK</td>
+      <td>200</td>
+      <td>102475.00</td>
+      <td>512.38</td>
+      <td>3000.00</td>
+      <td>[2010, 2012, 2014, 2016, 2018, 2020]</td>
+      <td>17079.17</td>
     </tr>
     <tr>
       <td>17</td>
-      <td>10527431</td>
-      <td>SANDELL, SCOTT</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2010, 2016]</td>
+      <td>5870457</td>
+      <td>JENCKS, CHRISTOPHER</td>
+      <td>309</td>
+      <td>102033.00</td>
+      <td>330.20</td>
+      <td>2700.00</td>
+      <td>[2004, 2006, 2012, 2014, 2016, 2018, 2020]</td>
+      <td>14576.14</td>
     </tr>
     <tr>
       <td>18</td>
-      <td>10527434</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940256112</td>
-      <td>[2014]</td>
+      <td>9683572</td>
+      <td>PROCKOP, DARWIN J. MD, PHD</td>
+      <td>3</td>
+      <td>102000.00</td>
+      <td>34000.00</td>
+      <td>100000.00</td>
+      <td>[2016, 2018]</td>
+      <td>51000.00</td>
     </tr>
     <tr>
       <td>19</td>
-      <td>10527441</td>
-      <td>SANDELL, SCOTT D. MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2000, 2008, 2010, 2012]</td>
+      <td>11659801</td>
+      <td>STOREY, BAYARD T PH.D.</td>
+      <td>16</td>
+      <td>91700.00</td>
+      <td>5731.25</td>
+      <td>25000.00</td>
+      <td>[2006, 2014, 2016]</td>
+      <td>30566.67</td>
     </tr>
     <tr>
       <td>20</td>
-      <td>10527444</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2018, 2020]</td>
+      <td>4435025</td>
+      <td>GOLLON, PETER</td>
+      <td>169</td>
+      <td>87000.00</td>
+      <td>514.79</td>
+      <td>2000.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>21750.00</td>
     </tr>
     <tr>
       <td>21</td>
-      <td>10527443</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940256940</td>
-      <td>[2004, 2006]</td>
+      <td>3993057</td>
+      <td>FRIEDMAN, DONNA</td>
+      <td>22</td>
+      <td>58550.00</td>
+      <td>2661.36</td>
+      <td>7500.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>14637.50</td>
     </tr>
     <tr>
       <td>22</td>
-      <td>10527432</td>
-      <td>SANDELL, SCOTT</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2016]</td>
+      <td>8656333</td>
+      <td>NASH, RICHARD</td>
+      <td>5</td>
+      <td>58099.00</td>
+      <td>11619.80</td>
+      <td>50000.00</td>
+      <td>[2018]</td>
+      <td>58099.00</td>
     </tr>
     <tr>
       <td>23</td>
-      <td>10527436</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2012]</td>
+      <td>12143213</td>
+      <td>TORRES, TOMAS</td>
+      <td>128</td>
+      <td>58062.00</td>
+      <td>453.61</td>
+      <td>2700.00</td>
+      <td>[2012, 2014, 2016, 2018, 2020]</td>
+      <td>11612.40</td>
     </tr>
     <tr>
       <td>24</td>
-      <td>10527446</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2018]</td>
+      <td>12265351</td>
+      <td>TUSK, BRADLEY</td>
+      <td>21</td>
+      <td>55600.00</td>
+      <td>2647.62</td>
+      <td>5400.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>13900.00</td>
     </tr>
     <tr>
       <td>25</td>
-      <td>10527439</td>
-      <td>SANDELL, SCOTT D.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2018]</td>
+      <td>4293837</td>
+      <td>GILBERT, JOHN</td>
+      <td>94</td>
+      <td>39225.00</td>
+      <td>417.29</td>
+      <td>2500.00</td>
+      <td>[2004, 2006, 2014, 2016, 2018, 2020]</td>
+      <td>6537.50</td>
     </tr>
     <tr>
       <td>26</td>
-      <td>10527442</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2000, 2002, 2004, 2006]</td>
+      <td>9165471</td>
+      <td>PARK, DAVID</td>
+      <td>12</td>
+      <td>36345.00</td>
+      <td>3028.75</td>
+      <td>10239.00</td>
+      <td>[2018]</td>
+      <td>36345.00</td>
+    </tr>
+    <tr>
+      <td>27</td>
+      <td>3678807</td>
+      <td>FERSTER, DAVID</td>
+      <td>62</td>
+      <td>32058.00</td>
+      <td>517.06</td>
+      <td>5000.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>8014.50</td>
+    </tr>
+    <tr>
+      <td>28</td>
+      <td>7037936</td>
+      <td>LEVINSON, FRANK</td>
+      <td>43</td>
+      <td>31541.00</td>
+      <td>733.51</td>
+      <td>5000.00</td>
+      <td>[2016, 2018, 2020]</td>
+      <td>10513.67</td>
+    </tr>
+    <tr>
+      <td>29</td>
+      <td>6147085</td>
+      <td>KAPER, TASSO</td>
+      <td>65</td>
+      <td>25109.00</td>
+      <td>386.29</td>
+      <td>2500.00</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+      <td>6277.25</td>
+    </tr>
+    <tr>
+      <td>30</td>
+      <td>11356137</td>
+      <td>SOLIMAN, KARL</td>
+      <td>9</td>
+      <td>25033.00</td>
+      <td>2781.44</td>
+      <td>24945.00</td>
+      <td>[2018]</td>
+      <td>25033.00</td>
+    </tr>
+    <tr>
+      <td>31</td>
+      <td>8417423</td>
+      <td>MORGAN, HOWARD L.</td>
+      <td>1</td>
+      <td>25000.00</td>
+      <td>25000.00</td>
+      <td>25000.00</td>
+      <td>[2018]</td>
+      <td>25000.00</td>
+    </tr>
+    <tr>
+      <td>32</td>
+      <td>8688914</td>
+      <td>NEGROPONTE, NICHOLAS</td>
+      <td>7</td>
+      <td>21987.00</td>
+      <td>3141.00</td>
+      <td>11189.00</td>
+      <td>[2018]</td>
+      <td>21987.00</td>
+    </tr>
+    <tr>
+      <td>33</td>
+      <td>5515167</td>
+      <td>HORLICK, SUSAN</td>
+      <td>222</td>
+      <td>20670.00</td>
+      <td>93.11</td>
+      <td>500.00</td>
+      <td>[2016, 2018, 2020]</td>
+      <td>6890.00</td>
+    </tr>
+    <tr>
+      <td>34</td>
+      <td>5601495</td>
+      <td>HUDSON, BRUCE S.</td>
+      <td>11</td>
+      <td>17000.00</td>
+      <td>1545.45</td>
+      <td>5000.00</td>
+      <td>[2016]</td>
+      <td>17000.00</td>
+    </tr>
+    <tr>
+      <td>35</td>
+      <td>4684620</td>
+      <td>GROSSBLATT, DAVID</td>
+      <td>6</td>
+      <td>16033.00</td>
+      <td>2672.17</td>
+      <td>10115.00</td>
+      <td>[2018]</td>
+      <td>16033.00</td>
+    </tr>
+    <tr>
+      <td>36</td>
+      <td>3850042</td>
+      <td>FORDE, JAMES</td>
+      <td>4</td>
+      <td>13500.00</td>
+      <td>3375.00</td>
+      <td>5400.00</td>
+      <td>[2018]</td>
+      <td>13500.00</td>
+    </tr>
+    <tr>
+      <td>37</td>
+      <td>5486301</td>
+      <td>HONARKAR, MOHAMMAD</td>
+      <td>43</td>
+      <td>11950.00</td>
+      <td>277.91</td>
+      <td>10000.00</td>
+      <td>[2016, 2018]</td>
+      <td>5975.00</td>
+    </tr>
+    <tr>
+      <td>38</td>
+      <td>11024692</td>
+      <td>SHOCH, JOHN PHD</td>
+      <td>2</td>
+      <td>11000.00</td>
+      <td>5500.00</td>
+      <td>10000.00</td>
+      <td>[2016, 2018]</td>
+      <td>5500.00</td>
+    </tr>
+    <tr>
+      <td>39</td>
+      <td>2576925</td>
+      <td>CUELLAR, CLIFFORD</td>
+      <td>54</td>
+      <td>10584.00</td>
+      <td>196.00</td>
+      <td>5000.00</td>
+      <td>[2016, 2018, 2020]</td>
+      <td>3528.00</td>
+    </tr>
+    <tr>
+      <td>40</td>
+      <td>9688035</td>
+      <td>PROOPS, JAY</td>
+      <td>2</td>
+      <td>10250.00</td>
+      <td>5125.00</td>
+      <td>10000.00</td>
+      <td>[2018]</td>
+      <td>10250.00</td>
+    </tr>
+    <tr>
+      <td>41</td>
+      <td>678448</td>
+      <td>BASSI, STEVE</td>
+      <td>1</td>
+      <td>10233.00</td>
+      <td>10233.00</td>
+      <td>10233.00</td>
+      <td>[2018]</td>
+      <td>10233.00</td>
+    </tr>
+    <tr>
+      <td>42</td>
+      <td>6872845</td>
+      <td>LAWRENCE, FRANK</td>
+      <td>11</td>
+      <td>10165.00</td>
+      <td>924.09</td>
+      <td>5000.00</td>
+      <td>[2016, 2020]</td>
+      <td>5082.50</td>
+    </tr>
+    <tr>
+      <td>43</td>
+      <td>11823232</td>
+      <td>SWINDELL, DAVE</td>
+      <td>2</td>
+      <td>10000.00</td>
+      <td>5000.00</td>
+      <td>5000.00</td>
+      <td>[2018]</td>
+      <td>10000.00</td>
+    </tr>
+    <tr>
+      <td>44</td>
+      <td>5902719</td>
+      <td>JHONG, EUGENE</td>
+      <td>8</td>
+      <td>8802.00</td>
+      <td>1100.25</td>
+      <td>8302.00</td>
+      <td>[2018, 2020]</td>
+      <td>4401.00</td>
+    </tr>
+    <tr>
+      <td>45</td>
+      <td>3997846</td>
+      <td>FRIEDMAN, RANDOLPH</td>
+      <td>2</td>
+      <td>7700.00</td>
+      <td>3850.00</td>
+      <td>5000.00</td>
+      <td>[2018, 2020]</td>
+      <td>3850.00</td>
+    </tr>
+    <tr>
+      <td>46</td>
+      <td>877907</td>
+      <td>BERG, FRED</td>
+      <td>17</td>
+      <td>6005.00</td>
+      <td>353.24</td>
+      <td>2510.00</td>
+      <td>[2016, 2018]</td>
+      <td>3002.50</td>
+    </tr>
+    <tr>
+      <td>47</td>
+      <td>9625220</td>
+      <td>POWERS, ANN</td>
+      <td>13</td>
+      <td>5110.00</td>
+      <td>393.08</td>
+      <td>1000.00</td>
+      <td>[2016, 2018]</td>
+      <td>2555.00</td>
+    </tr>
+    <tr>
+      <td>48</td>
+      <td>8496236</td>
+      <td>MOUNT, PHYLLIS F.</td>
+      <td>6</td>
+      <td>5071.00</td>
+      <td>845.17</td>
+      <td>2500.00</td>
+      <td>[2018, 2020]</td>
+      <td>2535.50</td>
+    </tr>
+    <tr>
+      <td>49</td>
+      <td>4828088</td>
+      <td>HALL, CLAIRE</td>
+      <td>2</td>
+      <td>5000.00</td>
+      <td>2500.00</td>
+      <td>2500.00</td>
+      <td>[2018]</td>
+      <td>5000.00</td>
     </tr>
   </tbody>
 </table>
@@ -13706,8 +14097,7 @@ select id,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Create-Dependent-Views">Create Dependent Views<a class="anchor-link" href="#Create-Dependent-Views">&#182;</a></h2><h3 id="Create-ctx_indiv_contrib">Create <code>ctx_indiv_contrib</code><a class="anchor-link" href="#Create-ctx_indiv_contrib">&#182;</a></h3><p>Now we'll create the context view for the contributions from the targeted "Individual" records</p>
-
+<h3 id="Top-Contributors-within-an-Election-Cycle">Top Contributors within an Election Cycle<a class="anchor-link" href="#Top-Contributors-within-an-Election-Cycle">&#182;</a></h3>
 </div>
 </div>
 </div>
@@ -13717,10 +14107,18 @@ select id,
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_indiv_contrib as
-select ic.*
-  from ctx_indiv ix
-  join indiv_contrib ic on ic.indiv_id = ix.id
+select d.id as donor_id,
+       d.name as donor_name,
+       dcx.elect_cycle,
+       count(*) cycle_contribs,
+       sum(dcx.transaction_amt) cycle_total_amount,
+       round(avg(dcx.transaction_amt), 2) cycle_avg_amount,
+       max(dcx.transaction_amt) cycle_max_amount
+  from ctx_donor_contrib dcx
+  join donor_indiv d on d.id = dcx.donor_indiv_id
+ group by 1, 2, 3
+ order by 5 desc
+ limit 50
 </pre></div>
 
     </div>
@@ -13738,7 +14136,7 @@ select ic.*
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
+50 rows affected.
 </pre>
 </div>
 </div>
@@ -13768,96 +14166,515 @@ Done.
   <thead>
     <tr style="text-align: right;">
       <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>And some quick validation on the view</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[7]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select count(*)             as contribs,
-       sum(transaction_amt) as total_amt,
-       array_agg(distinct elect_cycle) as elect_cycles
-  from ctx_indiv_contrib
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-1 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[7]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>contribs</th>
-      <th>total_amt</th>
-      <th>elect_cycles</th>
+      <th>donor_id</th>
+      <th>donor_name</th>
+      <th>elect_cycle</th>
+      <th>cycle_contribs</th>
+      <th>cycle_total_amount</th>
+      <th>cycle_avg_amount</th>
+      <th>cycle_max_amount</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>0</td>
+      <td>10979072</td>
+      <td>SHENKER, SCOTT</td>
+      <td>2018</td>
+      <td>175</td>
+      <td>616700.00</td>
+      <td>3524.00</td>
+      <td>50000.00</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>6169689</td>
+      <td>KARPLUS, BARBARA</td>
+      <td>2018</td>
+      <td>261</td>
+      <td>572685.00</td>
+      <td>2194.20</td>
+      <td>50000.00</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>779629</td>
+      <td>BEEUWKES, REINIER</td>
+      <td>2018</td>
+      <td>206</td>
+      <td>493400.00</td>
+      <td>2395.15</td>
+      <td>100000.00</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>1083690</td>
+      <td>BLUE, ALLEN</td>
+      <td>2016</td>
+      <td>62</td>
+      <td>288000.00</td>
+      <td>4645.16</td>
+      <td>33400.00</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>11902785</td>
+      <td>TAYLOR, DALE</td>
+      <td>2018</td>
+      <td>38</td>
+      <td>227200.00</td>
+      <td>5978.95</td>
+      <td>66100.00</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>28429</td>
+      <td>ABRAMSON, RONALD</td>
+      <td>2018</td>
+      <td>176</td>
+      <td>203524.00</td>
+      <td>1156.39</td>
+      <td>33400.00</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>6169689</td>
+      <td>KARPLUS, BARBARA</td>
+      <td>2016</td>
+      <td>35</td>
+      <td>189400.00</td>
+      <td>5411.43</td>
+      <td>73175.00</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>779629</td>
+      <td>BEEUWKES, REINIER</td>
+      <td>2016</td>
+      <td>141</td>
+      <td>185958.00</td>
+      <td>1318.85</td>
+      <td>8100.00</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>7863787</td>
+      <td>MCEVOY, NION</td>
+      <td>2018</td>
+      <td>325</td>
+      <td>175294.00</td>
+      <td>539.37</td>
+      <td>44300.00</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>9188602</td>
+      <td>PARK, TODD</td>
+      <td>2018</td>
+      <td>22</td>
+      <td>142214.00</td>
+      <td>6464.27</td>
+      <td>100000.00</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>28429</td>
+      <td>ABRAMSON, RONALD</td>
+      <td>2016</td>
+      <td>75</td>
+      <td>140150.00</td>
+      <td>1868.67</td>
+      <td>33400.00</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>4336953</td>
+      <td>GIRARDI, THOMAS V.</td>
+      <td>2014</td>
+      <td>6</td>
+      <td>140000.00</td>
+      <td>23333.33</td>
+      <td>100000.00</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>1083690</td>
+      <td>BLUE, ALLEN</td>
+      <td>2018</td>
+      <td>19</td>
+      <td>138400.00</td>
+      <td>7284.21</td>
+      <td>33900.00</td>
+    </tr>
+    <tr>
+      <td>13</td>
+      <td>1661575</td>
+      <td>BYERS, BROOK</td>
+      <td>2018</td>
+      <td>37</td>
+      <td>135600.00</td>
+      <td>3664.86</td>
+      <td>25000.00</td>
+    </tr>
+    <tr>
+      <td>14</td>
+      <td>10979072</td>
+      <td>SHENKER, SCOTT</td>
+      <td>2016</td>
+      <td>42</td>
+      <td>134600.00</td>
+      <td>3204.76</td>
+      <td>33400.00</td>
+    </tr>
+    <tr>
+      <td>15</td>
+      <td>779629</td>
+      <td>BEEUWKES, REINIER</td>
+      <td>2014</td>
+      <td>52</td>
+      <td>117500.00</td>
+      <td>2259.62</td>
+      <td>20000.00</td>
+    </tr>
+    <tr>
+      <td>16</td>
+      <td>6169689</td>
+      <td>KARPLUS, BARBARA</td>
+      <td>2020</td>
+      <td>44</td>
+      <td>116200.00</td>
+      <td>2640.91</td>
+      <td>5600.00</td>
+    </tr>
+    <tr>
+      <td>17</td>
+      <td>10325529</td>
+      <td>ROSZAK, MATTHEW</td>
+      <td>2018</td>
+      <td>5</td>
+      <td>107681.00</td>
+      <td>21536.20</td>
+      <td>102281.00</td>
+    </tr>
+    <tr>
+      <td>18</td>
+      <td>9683572</td>
+      <td>PROCKOP, DARWIN J. MD, PHD</td>
+      <td>2018</td>
+      <td>2</td>
+      <td>101000.00</td>
+      <td>50500.00</td>
+      <td>100000.00</td>
+    </tr>
+    <tr>
+      <td>19</td>
+      <td>10979072</td>
+      <td>SHENKER, SCOTT</td>
+      <td>2014</td>
+      <td>23</td>
+      <td>95800.00</td>
+      <td>4165.22</td>
+      <td>32400.00</td>
+    </tr>
+    <tr>
+      <td>20</td>
+      <td>11659801</td>
+      <td>STOREY, BAYARD T PH.D.</td>
+      <td>2016</td>
+      <td>11</td>
+      <td>88100.00</td>
+      <td>8009.09</td>
+      <td>25000.00</td>
+    </tr>
+    <tr>
+      <td>21</td>
+      <td>6433238</td>
+      <td>KIRK, CLAY</td>
+      <td>2018</td>
+      <td>44</td>
+      <td>85950.00</td>
+      <td>1953.41</td>
+      <td>20000.00</td>
+    </tr>
+    <tr>
+      <td>22</td>
+      <td>779629</td>
+      <td>BEEUWKES, REINIER</td>
+      <td>2020</td>
+      <td>30</td>
+      <td>84900.00</td>
+      <td>2830.00</td>
+      <td>33900.00</td>
+    </tr>
+    <tr>
+      <td>23</td>
+      <td>28429</td>
+      <td>ABRAMSON, RONALD</td>
+      <td>2014</td>
+      <td>25</td>
+      <td>77409.00</td>
+      <td>3096.36</td>
+      <td>30000.00</td>
+    </tr>
+    <tr>
+      <td>24</td>
+      <td>4336953</td>
+      <td>GIRARDI, THOMAS V.</td>
+      <td>2018</td>
+      <td>11</td>
+      <td>76400.00</td>
+      <td>6945.45</td>
+      <td>25000.00</td>
+    </tr>
+    <tr>
+      <td>25</td>
+      <td>7863787</td>
+      <td>MCEVOY, NION</td>
+      <td>2016</td>
+      <td>145</td>
+      <td>72555.00</td>
+      <td>500.38</td>
+      <td>5400.00</td>
+    </tr>
+    <tr>
+      <td>26</td>
+      <td>8848719</td>
+      <td>NORTON, JACK</td>
+      <td>2018</td>
+      <td>122</td>
+      <td>62575.00</td>
+      <td>512.91</td>
+      <td>3000.00</td>
+    </tr>
+    <tr>
+      <td>27</td>
+      <td>6822374</td>
+      <td>LARSEN, CHRIS</td>
+      <td>2018</td>
+      <td>13</td>
+      <td>62000.00</td>
+      <td>4769.23</td>
+      <td>25000.00</td>
+    </tr>
+    <tr>
+      <td>28</td>
+      <td>8656333</td>
+      <td>NASH, RICHARD</td>
+      <td>2018</td>
+      <td>5</td>
+      <td>58099.00</td>
+      <td>11619.80</td>
+      <td>50000.00</td>
+    </tr>
+    <tr>
+      <td>29</td>
+      <td>4435025</td>
+      <td>GOLLON, PETER</td>
+      <td>2018</td>
       <td>101</td>
-      <td>264450.00</td>
-      <td>[2000, 2002, 2004, 2006, 2008, 2010, 2012, 201...</td>
+      <td>57775.00</td>
+      <td>572.03</td>
+      <td>2000.00</td>
+    </tr>
+    <tr>
+      <td>30</td>
+      <td>8793106</td>
+      <td>NIELSEN, SHEILA</td>
+      <td>2018</td>
+      <td>320</td>
+      <td>56415.00</td>
+      <td>176.30</td>
+      <td>5000.00</td>
+    </tr>
+    <tr>
+      <td>31</td>
+      <td>4745356</td>
+      <td>GURAL, JEFFREY</td>
+      <td>2018</td>
+      <td>16</td>
+      <td>51700.00</td>
+      <td>3231.25</td>
+      <td>10000.00</td>
+    </tr>
+    <tr>
+      <td>32</td>
+      <td>6110433</td>
+      <td>KAHN, RONALD N</td>
+      <td>2018</td>
+      <td>18</td>
+      <td>50900.00</td>
+      <td>2827.78</td>
+      <td>5000.00</td>
+    </tr>
+    <tr>
+      <td>33</td>
+      <td>28429</td>
+      <td>ABRAMSON, RONALD</td>
+      <td>2020</td>
+      <td>18</td>
+      <td>50250.00</td>
+      <td>2791.67</td>
+      <td>20000.00</td>
+    </tr>
+    <tr>
+      <td>34</td>
+      <td>6433238</td>
+      <td>KIRK, CLAY</td>
+      <td>2016</td>
+      <td>25</td>
+      <td>50200.00</td>
+      <td>2008.00</td>
+      <td>4000.00</td>
+    </tr>
+    <tr>
+      <td>35</td>
+      <td>7863787</td>
+      <td>MCEVOY, NION</td>
+      <td>2020</td>
+      <td>1</td>
+      <td>50000.00</td>
+      <td>50000.00</td>
+      <td>50000.00</td>
+    </tr>
+    <tr>
+      <td>36</td>
+      <td>5870457</td>
+      <td>JENCKS, CHRISTOPHER</td>
+      <td>2018</td>
+      <td>203</td>
+      <td>47493.00</td>
+      <td>233.96</td>
+      <td>2000.00</td>
+    </tr>
+    <tr>
+      <td>37</td>
+      <td>6433238</td>
+      <td>KIRK, CLAY</td>
+      <td>2014</td>
+      <td>19</td>
+      <td>42100.00</td>
+      <td>2215.79</td>
+      <td>5000.00</td>
+    </tr>
+    <tr>
+      <td>38</td>
+      <td>4745356</td>
+      <td>GURAL, JEFFREY</td>
+      <td>2016</td>
+      <td>14</td>
+      <td>38400.00</td>
+      <td>2742.86</td>
+      <td>5000.00</td>
+    </tr>
+    <tr>
+      <td>39</td>
+      <td>6110433</td>
+      <td>KAHN, RONALD N</td>
+      <td>2016</td>
+      <td>13</td>
+      <td>37400.00</td>
+      <td>2876.92</td>
+      <td>5000.00</td>
+    </tr>
+    <tr>
+      <td>40</td>
+      <td>9165471</td>
+      <td>PARK, DAVID</td>
+      <td>2018</td>
+      <td>12</td>
+      <td>36345.00</td>
+      <td>3028.75</td>
+      <td>10239.00</td>
+    </tr>
+    <tr>
+      <td>41</td>
+      <td>5870457</td>
+      <td>JENCKS, CHRISTOPHER</td>
+      <td>2016</td>
+      <td>41</td>
+      <td>36300.00</td>
+      <td>885.37</td>
+      <td>2700.00</td>
+    </tr>
+    <tr>
+      <td>42</td>
+      <td>12143213</td>
+      <td>TORRES, TOMAS</td>
+      <td>2014</td>
+      <td>74</td>
+      <td>36209.00</td>
+      <td>489.31</td>
+      <td>2600.00</td>
+    </tr>
+    <tr>
+      <td>43</td>
+      <td>6822374</td>
+      <td>LARSEN, CHRIS</td>
+      <td>2016</td>
+      <td>6</td>
+      <td>36200.00</td>
+      <td>6033.33</td>
+      <td>20000.00</td>
+    </tr>
+    <tr>
+      <td>44</td>
+      <td>12265351</td>
+      <td>TUSK, BRADLEY</td>
+      <td>2018</td>
+      <td>13</td>
+      <td>35500.00</td>
+      <td>2730.77</td>
+      <td>5400.00</td>
+    </tr>
+    <tr>
+      <td>45</td>
+      <td>6433238</td>
+      <td>KIRK, CLAY</td>
+      <td>2020</td>
+      <td>10</td>
+      <td>33600.00</td>
+      <td>3360.00</td>
+      <td>15000.00</td>
+    </tr>
+    <tr>
+      <td>46</td>
+      <td>3993057</td>
+      <td>FRIEDMAN, DONNA</td>
+      <td>2020</td>
+      <td>9</td>
+      <td>27700.00</td>
+      <td>3077.78</td>
+      <td>7500.00</td>
+    </tr>
+    <tr>
+      <td>47</td>
+      <td>7863787</td>
+      <td>MCEVOY, NION</td>
+      <td>2004</td>
+      <td>4</td>
+      <td>27500.00</td>
+      <td>6875.00</td>
+      <td>25000.00</td>
+    </tr>
+    <tr>
+      <td>48</td>
+      <td>1661575</td>
+      <td>BYERS, BROOK</td>
+      <td>2016</td>
+      <td>12</td>
+      <td>27100.00</td>
+      <td>2258.33</td>
+      <td>5400.00</td>
+    </tr>
+    <tr>
+      <td>49</td>
+      <td>8793106</td>
+      <td>NIELSEN, SHEILA</td>
+      <td>2014</td>
+      <td>10</td>
+      <td>26000.00</td>
+      <td>2600.00</td>
+      <td>10000.00</td>
     </tr>
   </tbody>
 </table>

@@ -2,7 +2,7 @@
 <html>
 <head><meta charset="utf-8" />
 
-<title>dc5_ctx_iseg_household</title>
+<title>dc5_ctx_donor_multi_person</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
@@ -13077,18 +13077,18 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h1>Define Individual Segment Context &ndash; Household Use Case</h1>
-<h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Explore the FEC data by specifying SQL predicates that identify <strong>Individual Segments</strong>, which are static lists of Individual (<code>indiv</code> table) records.  Note that Individual Segments do not distinguish between constituent Individual records that attempt to represent either the same or different real-world people.  It is up to the definer of an Individual Segment as to the meaning of the collective membership records for a segment.  Note that an Individual Segment context may including one <em>or more</em> segments (e.g. by name or ID).  As with Individual and Household contexts, Donor identities are not discernible within queries using this context type.</p>
+<h1>Define Donor Context &ndash; Multi-Person Use Case</h1>
+<h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Explore the FEC data by specifying SQL predicates that identify <strong>Donors</strong>, which are sets of Individual (<code>indiv</code> table) records deemed (e.g. conjectured or asserted) to represent the same real-world person.  The advantage of using Donor (over Individual) is that it is possible to distinguish between the contribution of distinct people identities within a result set (to the degree that the Donor mappings are accurate).</p>
 <p>This approach will create the following query contexts:</p>
 <p><strong>Principal Context View</strong></p>
 <ul>
-<li><code>ctx_iseg</code></li>
+<li><code>ctx_donor</code></li>
 </ul>
 <p><strong>Dependent Context Views</strong></p>
 <ul>
-<li><code>ctx_iseg_memb</code></li>
 <li><code>ctx_indiv</code></li>
-<li><code>ctx_contrib</code> (<em>without</em> <code>donor_indiv_id</code>)</li>
+<li><code>ctx_indiv_contrib</code></li>
+<li><code>ctx_donor_contrib</code></li>
 </ul>
 
 </div>
@@ -13097,11 +13097,13 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Notebook-Setup">Notebook Setup<a class="anchor-link" href="#Notebook-Setup">&#182;</a></h2><ul>
-<li>Configure database connect information and options</li>
-<li>Clear potentially interfering context (PostgreSQL doesn't let you replace a view definition with conflicting column names)</li>
-<li>Set styling for notebook</li>
-</ul>
+<h2 id="Notebook-Setup">Notebook Setup<a class="anchor-link" href="#Notebook-Setup">&#182;</a></h2><h3 id="Configure-database-connect-info/options">Configure database connect info/options<a class="anchor-link" href="#Configure-database-connect-info/options">&#182;</a></h3><p>Note: database connect string can be specified on the initial <code>%sql</code> command:</p>
+<div class="highlight"><pre><span></span><span class="n">database_url</span> <span class="o">=</span> <span class="s2">&quot;postgresql+psycopg2://user@localhost/fecdb&quot;</span>
+<span class="o">%</span><span class="n">sql</span> <span class="err">$</span><span class="n">database_url</span>
+</pre></div>
+<p>Or, connect string is taken from DATABASE_URL environment variable (if not specified for <code>%sql</code>):</p>
+<div class="highlight"><pre><span></span><span class="o">%</span><span class="n">sql</span>
+</pre></div>
 
 </div>
 </div>
@@ -13111,12 +13113,11 @@ div#notebook {
 <div class="prompt input_prompt">In&nbsp;[1]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="n">sqlconnect</span> <span class="o">=</span> <span class="s2">&quot;postgresql+psycopg2://crash@localhost/fecdb&quot;</span>
-
-<span class="o">%</span><span class="k">load_ext</span> sql
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">load_ext</span> sql
 <span class="o">%</span><span class="k">config</span> SqlMagic.autopandas=True
 <span class="o">%</span><span class="k">config</span> InteractiveShell.ast_node_interactivity=&#39;last_expr_or_assign&#39;
-<span class="o">%</span><span class="k">sql</span> $sqlconnect
+<span class="c1"># connect string taken from DATABASE_URL environment variable</span>
+<span class="o">%</span><span class="k">sql</span>
 </pre></div>
 
     </div>
@@ -13147,7 +13148,7 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Note that we drop <em>all</em> context views so we won't have any inconsistencies after this notebook is run.  After defining <code>ctx_indiv</code> below, we will define all dependent views (see Overview, above), and leave any higher-order or orthogonal views undefined</p>
+<h3 id="Clear-context">Clear context<a class="anchor-link" href="#Clear-context">&#182;</a></h3><p>Note that we drop <em>all</em> context views so we won't have any inconsistencies after this notebook is run.  After defining <code>ctx_indiv</code> below, we will define all dependent views (see Overview, above), and leave any higher-order or orthogonal views undefined</p>
 
 </div>
 </div>
@@ -13157,13 +13158,15 @@ div#notebook {
 <div class="prompt input_prompt">In&nbsp;[2]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> drop view if exists ctx_contrib   cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_indiv     cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_donor     cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg_memb cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg      cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg_memb cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg      cascade
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg_memb     cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg          cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_donor_contrib cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_donor         cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_household     cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg_memb     cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg          cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_indiv_contrib cascade
+<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_indiv         cascade
 </pre></div>
 
     </div>
@@ -13181,6 +13184,10 @@ div#notebook {
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+ * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+ * postgresql+psycopg2://crash@localhost/fecdb
 Done.
  * postgresql+psycopg2://crash@localhost/fecdb
 Done.
@@ -13237,6 +13244,13 @@ Done.
 </div>
 
 </div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Set-styling">Set styling<a class="anchor-link" href="#Set-styling">&#182;</a></h3>
+</div>
+</div>
+</div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">In&nbsp;[3]:</div>
@@ -13282,8 +13296,8 @@ Done.
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Create-Individual-Segment-(for-Household)">Create Individual Segment (for Household)<a class="anchor-link" href="#Create-Individual-Segment-(for-Household)">&#182;</a></h2><p>For this use case, we are defining an Individual Segment representing a household we have previously identified.</p>
-<p>Note, we are adding the "epoch" (unixtime) suffix for uniqueness, so we don't always have to clean up between runs</p>
+<h2 id="Create-Donor-Identities">Create Donor Identities<a class="anchor-link" href="#Create-Donor-Identities">&#182;</a></h2><p>Since the single-donor case is pretty straightforward, let's go with a multi-donor example here.  We'll create Donor identities for each of the people we have identified in the household examined in <code>el_queries1.sql</code> and <code>el_queries3.sql</code>.</p>
+<p>First, we identity the primary donor in the household.</p>
 
 </div>
 </div>
@@ -13294,10 +13308,15 @@ Done.
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span> result &lt;&lt;
-select create_indiv_seg(array_agg(i.id), concat(&#39;Sandell 9402x Household - &#39;, round(extract(epoch from now()))))
-  from indiv i
- where i.name like &#39;SANDELL, %&#39;
-   and i.zip_code ~ &#39;9402[58]&#39;
+with indiv_set as (
+    select i.*
+      from indiv i
+     where i.name like &#39;SANDELL, SCOTT%&#39;
+       and i.zip_code ~ &#39;9402[58]&#39;
+       and i.name !~ &#39;MRS\.&#39;
+)
+select set_donor_indiv(&#39;indiv&#39;, array_agg(id)) as donor_indiv_id
+  from indiv_set
 </pre></div>
 
     </div>
@@ -13330,7 +13349,7 @@ Returning data to local variable result
 <div class="prompt input_prompt">In&nbsp;[5]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="n">indiv_seg_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">donor_indiv_id1</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
 </pre></div>
 
     </div>
@@ -13349,7 +13368,7 @@ Returning data to local variable result
 
 
 <div class="output_text output_subarea output_execute_result">
-<pre>5</pre>
+<pre>10527429</pre>
 </div>
 
 </div>
@@ -13361,7 +13380,7 @@ Returning data to local variable result
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Create-Principal-View-(ctx_iseg)">Create Principal View (<code>ctx_iseg</code>)<a class="anchor-link" href="#Create-Principal-View-(ctx_iseg)">&#182;</a></h2><p>The context will represent only the single segment, just defined.  Queries written against this context will also work for multi-segment contexts.</p>
+<p>Next, we identify the other donor (or, remaining donors) in the household, by exclusion</p>
 
 </div>
 </div>
@@ -13371,82 +13390,16 @@ Returning data to local variable result
 <div class="prompt input_prompt">In&nbsp;[6]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_iseg as
-select id,
-       name,
-       description
-  from indiv_seg isg
- where isg.id = :indiv_seg_id
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[6]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[7]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select *
-  from ctx_iseg
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span> result &lt;&lt;
+with indiv_set as (
+    select i.*
+      from indiv i
+     where i.name like &#39;SANDELL, %&#39;
+       and i.zip_code ~ &#39;9402[58]&#39;
+       and coalesce(i.donor_indiv_id, 0) != :donor_indiv_id1
+)
+select set_donor_indiv(&#39;indiv&#39;, array_agg(id)) as donor_indiv_id
+  from indiv_set
 </pre></div>
 
     </div>
@@ -13465,9 +13418,30 @@ select *
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
 1 rows affected.
+Returning data to local variable result
 </pre>
 </div>
 </div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[7]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">donor_indiv_id2</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
 
 <div class="output_area">
 
@@ -13475,40 +13449,9 @@ select *
 
 
 
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
 
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>id</th>
-      <th>name</th>
-      <th>description</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>5</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>None</td>
-    </tr>
-  </tbody>
-</table>
-</div>
+<div class="output_text output_subarea output_execute_result">
+<pre>10527363</pre>
 </div>
 
 </div>
@@ -13520,7 +13463,8 @@ select *
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Create-Dependent-Views">Create Dependent Views<a class="anchor-link" href="#Create-Dependent-Views">&#182;</a></h2><h3 id="Create-ctx_iseg_memb">Create <code>ctx_iseg_memb</code><a class="anchor-link" href="#Create-ctx_iseg_memb">&#182;</a></h3>
+<h2 id="Create-Principal-View-(ctx_donor)">Create Principal View (<code>ctx_donor</code>)<a class="anchor-link" href="#Create-Principal-View-(ctx_donor)">&#182;</a></h2><p>Now we set the query context to be the combinatin of the two Donor identities just created (identified by <code>donor_indiv_id</code>)</p>
+
 </div>
 </div>
 </div>
@@ -13530,10 +13474,10 @@ select *
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_iseg_memb as
-select ism.*
-  from ctx_iseg isx
-  join indiv_seg_memb ism on ism.indiv_seg_id = isx.id
+create or replace view ctx_donor as
+select d.*
+  from donor_indiv d
+ where d.id in (:donor_indiv_id1, :donor_indiv_id2)
 </pre></div>
 
     </div>
@@ -13595,21 +13539,27 @@ Done.
 </div>
 
 </div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Let's take a quick look at the context before proceeding.  Note: even though these records are coming from the <code>indiv</code> table, we really consider them to be coming from the <code>donor_indiv</code> view, thus in the <strong>Donor</strong> domain (and not the <strong>Individual</strong> domain).</p>
+
+</div>
+</div>
+</div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">In&nbsp;[9]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select isg.name as iseg_name,
-       i.name   as indiv_name,
-       i.city,
-       i.state,
-       i.zip_code,
-       i.elect_cycles
-  from ctx_iseg_memb ismx
-  join indiv_seg isg on isg.id = ismx.indiv_seg_id
-  join indiv i on i.id = ismx.indiv_id
+select id,
+       name,
+       city,
+       state,
+       zip_code,
+       elect_cycles
+  from ctx_donor
 </pre></div>
 
     </div>
@@ -13627,7 +13577,7 @@ select isg.name as iseg_name,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-27 rows affected.
+2 rows affected.
 </pre>
 </div>
 </div>
@@ -13657,8 +13607,8 @@ select isg.name as iseg_name,
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>iseg_name</th>
-      <th>indiv_name</th>
+      <th>id</th>
+      <th>name</th>
       <th>city</th>
       <th>state</th>
       <th>zip_code</th>
@@ -13668,246 +13618,21 @@ select isg.name as iseg_name,
   <tbody>
     <tr>
       <td>0</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, JENNIFER A MS.</td>
+      <td>10527363</td>
+      <td>SANDELL, JENNIFER</td>
       <td>MENLO PARK</td>
       <td>CA</td>
       <td>94025</td>
-      <td>[2004]</td>
+      <td>[2004, 2006, 2008, 2010]</td>
     </tr>
     <tr>
       <td>1</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004, 2006, 2008, 2010]</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, JENNIFER A</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2006, 2008]</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, JENNIFER MS.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004]</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, JENNIFER AYER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004, 2010]</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940250</td>
-      <td>[2004]</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>7</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>8</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004, 2006, 2008, 2010]</td>
-    </tr>
-    <tr>
-      <td>9</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT MRS.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004]</td>
-    </tr>
-    <tr>
-      <td>10</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>11</td>
-      <td>Sandell 9402x Household - 1568394391</td>
+      <td>10527429</td>
       <td>SANDELL, SCOTT</td>
       <td>MENLO PARK</td>
       <td>CA</td>
       <td>94025</td>
       <td>[2000, 2008, 2010, 2012, 2016]</td>
-    </tr>
-    <tr>
-      <td>12</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>13</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>14</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>15</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT D.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2010]</td>
-    </tr>
-    <tr>
-      <td>16</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2010, 2016]</td>
-    </tr>
-    <tr>
-      <td>17</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT D. MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2000, 2008, 2010, 2012]</td>
-    </tr>
-    <tr>
-      <td>18</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940256112</td>
-      <td>[2014]</td>
-    </tr>
-    <tr>
-      <td>19</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>20</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940256940</td>
-      <td>[2004, 2006]</td>
-    </tr>
-    <tr>
-      <td>21</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2012]</td>
-    </tr>
-    <tr>
-      <td>22</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>23</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT D.</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>24</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>25</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT D.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>26</td>
-      <td>Sandell 9402x Household - 1568394391</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2000, 2002, 2004, 2006]</td>
     </tr>
   </tbody>
 </table>
@@ -13923,7 +13648,7 @@ select isg.name as iseg_name,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Create-ctx_indiv">Create <code>ctx_indiv</code><a class="anchor-link" href="#Create-ctx_indiv">&#182;</a></h3>
+<h2 id="Create-Dependent-Views">Create Dependent Views<a class="anchor-link" href="#Create-Dependent-Views">&#182;</a></h2><h3 id="Create-ctx_indiv">Create <code>ctx_indiv</code><a class="anchor-link" href="#Create-ctx_indiv">&#182;</a></h3>
 </div>
 </div>
 </div>
@@ -13935,8 +13660,8 @@ select isg.name as iseg_name,
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
 create or replace view ctx_indiv as
 select i.*
-  from ctx_iseg_memb ismx
-  join indiv i on i.id = ismx.indiv_id
+  from ctx_donor dx
+  join indiv i on i.donor_indiv_id = dx.id
 </pre></div>
 
     </div>
@@ -13998,6 +13723,14 @@ Done.
 </div>
 
 </div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>And visually inspect...</p>
+
+</div>
+</div>
+</div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">In&nbsp;[11]:</div>
@@ -14009,8 +13742,10 @@ select id,
        city,
        state,
        zip_code,
-       elect_cycles
+       elect_cycles,
+       donor_indiv_id
   from ctx_indiv
+ order by donor_indiv_id
 </pre></div>
 
     </div>
@@ -14064,161 +13799,179 @@ select id,
       <th>state</th>
       <th>zip_code</th>
       <th>elect_cycles</th>
+      <th>donor_indiv_id</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>0</td>
-      <td>10527369</td>
-      <td>SANDELL, JENNIFER A MS.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004]</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>10527363</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004, 2006, 2008, 2010]</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>10527368</td>
-      <td>SANDELL, JENNIFER A</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2006, 2008]</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>10527371</td>
-      <td>SANDELL, JENNIFER MS.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004]</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>10527370</td>
-      <td>SANDELL, JENNIFER AYER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>94025</td>
-      <td>[2004, 2010]</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>10527364</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940250</td>
-      <td>[2004]</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>10527366</td>
-      <td>SANDELL, JENNIFER</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>7</td>
       <td>10527365</td>
       <td>SANDELL, JENNIFER</td>
       <td>PORTOLA VALLEY</td>
       <td>CA</td>
       <td>94028</td>
       <td>[2018]</td>
+      <td>10527363</td>
     </tr>
     <tr>
-      <td>8</td>
-      <td>10527433</td>
-      <td>SANDELL, SCOTT D</td>
+      <td>1</td>
+      <td>10527366</td>
+      <td>SANDELL, JENNIFER</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>940287608</td>
+      <td>[2016, 2018, 2020]</td>
+      <td>10527363</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>10527364</td>
+      <td>SANDELL, JENNIFER</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940250</td>
+      <td>[2004]</td>
+      <td>10527363</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>10527370</td>
+      <td>SANDELL, JENNIFER AYER</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004, 2010]</td>
+      <td>10527363</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>10527371</td>
+      <td>SANDELL, JENNIFER MS.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004]</td>
+      <td>10527363</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>10527368</td>
+      <td>SANDELL, JENNIFER A</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2006, 2008]</td>
+      <td>10527363</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>10527363</td>
+      <td>SANDELL, JENNIFER</td>
       <td>MENLO PARK</td>
       <td>CA</td>
       <td>94025</td>
       <td>[2004, 2006, 2008, 2010]</td>
+      <td>10527363</td>
     </tr>
     <tr>
-      <td>9</td>
+      <td>7</td>
+      <td>10527369</td>
+      <td>SANDELL, JENNIFER A MS.</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004]</td>
+      <td>10527363</td>
+    </tr>
+    <tr>
+      <td>8</td>
       <td>10527447</td>
       <td>SANDELL, SCOTT MRS.</td>
       <td>MENLO PARK</td>
       <td>CA</td>
       <td>94025</td>
       <td>[2004]</td>
+      <td>10527363</td>
     </tr>
     <tr>
-      <td>10</td>
-      <td>10527430</td>
-      <td>SANDELL, SCOTT</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>11</td>
-      <td>10527429</td>
-      <td>SANDELL, SCOTT</td>
+      <td>9</td>
+      <td>10527442</td>
+      <td>SANDELL, SCOTT MR.</td>
       <td>MENLO PARK</td>
       <td>CA</td>
       <td>94025</td>
-      <td>[2000, 2008, 2010, 2012, 2016]</td>
+      <td>[2000, 2002, 2004, 2006]</td>
+      <td>10527429</td>
     </tr>
     <tr>
-      <td>12</td>
-      <td>10527435</td>
-      <td>SANDELL, SCOTT D</td>
+      <td>10</td>
+      <td>10527439</td>
+      <td>SANDELL, SCOTT D.</td>
       <td>MENLO PARK</td>
       <td>CA</td>
       <td>940257022</td>
+      <td>[2018]</td>
+      <td>10527429</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>10527446</td>
+      <td>SANDELL, SCOTT MR.</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>940287608</td>
+      <td>[2018]</td>
+      <td>10527429</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>10527440</td>
+      <td>SANDELL, SCOTT D.</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>94028</td>
       <td>[2016]</td>
+      <td>10527429</td>
     </tr>
     <tr>
       <td>13</td>
-      <td>10527437</td>
+      <td>10527436</td>
       <td>SANDELL, SCOTT D</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>94028</td>
+      <td>[2012]</td>
+      <td>10527429</td>
+    </tr>
+    <tr>
+      <td>14</td>
+      <td>10527432</td>
+      <td>SANDELL, SCOTT</td>
       <td>PORTOLA VALLEY</td>
       <td>CA</td>
       <td>940287608</td>
       <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>14</td>
-      <td>10527445</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2018]</td>
+      <td>10527429</td>
     </tr>
     <tr>
       <td>15</td>
-      <td>10527438</td>
-      <td>SANDELL, SCOTT D.</td>
+      <td>10527443</td>
+      <td>SANDELL, SCOTT MR.</td>
       <td>MENLO PARK</td>
       <td>CA</td>
-      <td>94025</td>
-      <td>[2010]</td>
+      <td>940256940</td>
+      <td>[2004, 2006]</td>
+      <td>10527429</td>
     </tr>
     <tr>
       <td>16</td>
-      <td>10527431</td>
-      <td>SANDELL, SCOTT</td>
-      <td>PORTOLA VALLEY</td>
+      <td>10527444</td>
+      <td>SANDELL, SCOTT MR.</td>
+      <td>MENLO PARK</td>
       <td>CA</td>
-      <td>94028</td>
-      <td>[2010, 2016]</td>
+      <td>940257022</td>
+      <td>[2018, 2020]</td>
+      <td>10527429</td>
     </tr>
     <tr>
       <td>17</td>
@@ -14228,6 +13981,7 @@ select id,
       <td>CA</td>
       <td>94025</td>
       <td>[2000, 2008, 2010, 2012]</td>
+      <td>10527429</td>
     </tr>
     <tr>
       <td>18</td>
@@ -14237,78 +13991,87 @@ select id,
       <td>CA</td>
       <td>940256112</td>
       <td>[2014]</td>
+      <td>10527429</td>
     </tr>
     <tr>
       <td>19</td>
-      <td>10527444</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>20</td>
-      <td>10527443</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940256940</td>
-      <td>[2004, 2006]</td>
-    </tr>
-    <tr>
-      <td>21</td>
-      <td>10527436</td>
-      <td>SANDELL, SCOTT D</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>94028</td>
-      <td>[2012]</td>
-    </tr>
-    <tr>
-      <td>22</td>
-      <td>10527432</td>
+      <td>10527431</td>
       <td>SANDELL, SCOTT</td>
       <td>PORTOLA VALLEY</td>
       <td>CA</td>
-      <td>940287608</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>23</td>
-      <td>10527440</td>
-      <td>SANDELL, SCOTT D.</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
       <td>94028</td>
-      <td>[2016]</td>
+      <td>[2010, 2016]</td>
+      <td>10527429</td>
     </tr>
     <tr>
-      <td>24</td>
-      <td>10527446</td>
-      <td>SANDELL, SCOTT MR.</td>
-      <td>PORTOLA VALLEY</td>
-      <td>CA</td>
-      <td>940287608</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>25</td>
-      <td>10527439</td>
+      <td>20</td>
+      <td>10527438</td>
       <td>SANDELL, SCOTT D.</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257022</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>26</td>
-      <td>10527442</td>
-      <td>SANDELL, SCOTT MR.</td>
       <td>MENLO PARK</td>
       <td>CA</td>
       <td>94025</td>
-      <td>[2000, 2002, 2004, 2006]</td>
+      <td>[2010]</td>
+      <td>10527429</td>
+    </tr>
+    <tr>
+      <td>21</td>
+      <td>10527445</td>
+      <td>SANDELL, SCOTT MR.</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>94028</td>
+      <td>[2018]</td>
+      <td>10527429</td>
+    </tr>
+    <tr>
+      <td>22</td>
+      <td>10527437</td>
+      <td>SANDELL, SCOTT D</td>
+      <td>PORTOLA VALLEY</td>
+      <td>CA</td>
+      <td>940287608</td>
+      <td>[2016]</td>
+      <td>10527429</td>
+    </tr>
+    <tr>
+      <td>23</td>
+      <td>10527435</td>
+      <td>SANDELL, SCOTT D</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940257022</td>
+      <td>[2016]</td>
+      <td>10527429</td>
+    </tr>
+    <tr>
+      <td>24</td>
+      <td>10527429</td>
+      <td>SANDELL, SCOTT</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2000, 2008, 2010, 2012, 2016]</td>
+      <td>10527429</td>
+    </tr>
+    <tr>
+      <td>25</td>
+      <td>10527430</td>
+      <td>SANDELL, SCOTT</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>940257022</td>
+      <td>[2016, 2018, 2020]</td>
+      <td>10527429</td>
+    </tr>
+    <tr>
+      <td>26</td>
+      <td>10527433</td>
+      <td>SANDELL, SCOTT D</td>
+      <td>MENLO PARK</td>
+      <td>CA</td>
+      <td>94025</td>
+      <td>[2004, 2006, 2008, 2010]</td>
+      <td>10527429</td>
     </tr>
   </tbody>
 </table>
@@ -14324,8 +14087,7 @@ select id,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Create-ctx_contrib">Create <code>ctx_contrib</code><a class="anchor-link" href="#Create-ctx_contrib">&#182;</a></h3><p>Note: as with <code>dc4</code>, we are <strong><em>not</em></strong> adding <code>donor_indiv_id</code> to this view (on top of the <code>indiv_contrib</code> columns) because we do not know that Donor records are properly identified within the <code>indiv</code> records for the context.  Thus, queries using this context view are <strong><em>not</em></strong> able to join to and/or group by the underlying Donor record.</p>
-
+<h3 id="Create-ctx_indiv_contrib">Create <code>ctx_indiv_contrib</code><a class="anchor-link" href="#Create-ctx_indiv_contrib">&#182;</a></h3>
 </div>
 </div>
 </div>
@@ -14335,7 +14097,7 @@ select id,
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_contrib as
+create or replace view ctx_indiv_contrib as
 select ic.*
   from ctx_indiv ix
   join indiv_contrib ic on ic.indiv_id = ix.id
@@ -14400,6 +14162,14 @@ Done.
 </div>
 
 </div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>And validate...</p>
+
+</div>
+</div>
+</div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">In&nbsp;[13]:</div>
@@ -14409,7 +14179,7 @@ Done.
 select count(*)             as contribs,
        sum(transaction_amt) as total_amt,
        array_agg(distinct elect_cycle) as elect_cycles
-  from ctx_contrib
+  from ctx_indiv_contrib
 </pre></div>
 
     </div>
@@ -14483,7 +14253,7 @@ select count(*)             as contribs,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>As stated above, we are not able to use <code>donor_indiv_id</code> to join with <code>donor_indiv</code> (as we do in <code>dc3</code>, <code>dc6</code>, and <code>dc7</code>), so the following query should result in a "<strong>column cx.donor_indiv_id does not exist</strong>" error (note: ignore any hint offered by PostgreSQL, it's well-meaning, but off-base here)</p>
+<h3 id="Create-ctx_donor_contrib">Create <code>ctx_donor_contrib</code><a class="anchor-link" href="#Create-ctx_donor_contrib">&#182;</a></h3><p>This is really the same as <code>ctx_indiv_contrib</code>, except that we are adding <code>donor_indiv_id</code> on top of the <code>indiv_contrib</code> columns so that queries using this context view are able to join to (and/or group by) the underlying Donor record (and not just the Individual associated with the contribution record).</p>
 
 </div>
 </div>
@@ -14494,12 +14264,84 @@ select count(*)             as contribs,
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+create or replace view ctx_donor_contrib as
+select ic.*,
+       ix.donor_indiv_id
+  from ctx_indiv ix
+  join indiv_contrib ic on ic.indiv_id = ix.id
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[14]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[15]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
 select d.id                 as donor_id,
        d.name               as donor_name,
        count(*)             as contribs,
        sum(transaction_amt) as total_amt,
        array_agg(distinct elect_cycle) as elect_cycles
-  from ctx_contrib cx
+  from ctx_donor_contrib cx
   join donor_indiv d on d.id = cx.donor_indiv_id
  group by 1, 2
 </pre></div>
@@ -14519,22 +14361,65 @@ select d.id                 as donor_id,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-(psycopg2.errors.UndefinedColumn) column cx.donor_indiv_id does not exist
-LINE 7:   join donor_indiv d on d.id = cx.donor_indiv_id
-                                       ^
-HINT:  Perhaps you meant to reference the column &#34;d.donor_indiv_id&#34;.
-
-[SQL: select d.id                 as donor_id,
-       d.name               as donor_name,
-       count(*)             as contribs,
-       sum(transaction_amt) as total_amt,
-       array_agg(distinct elect_cycle) as elect_cycles
-  from ctx_contrib cx
-  join donor_indiv d on d.id = cx.donor_indiv_id
- group by 1, 2]
-(Background on this error at: http://sqlalche.me/e/f405)
+2 rows affected.
 </pre>
 </div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[15]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>donor_id</th>
+      <th>donor_name</th>
+      <th>contribs</th>
+      <th>total_amt</th>
+      <th>elect_cycles</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>10527363</td>
+      <td>SANDELL, JENNIFER</td>
+      <td>28</td>
+      <td>37200.00</td>
+      <td>[2004, 2006, 2008, 2010, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>10527429</td>
+      <td>SANDELL, SCOTT</td>
+      <td>73</td>
+      <td>227250.00</td>
+      <td>[2000, 2002, 2004, 2006, 2008, 2010, 2012, 201...</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
 </div>
 
 </div>

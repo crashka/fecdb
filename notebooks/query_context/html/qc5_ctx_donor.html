@@ -2,7 +2,7 @@
 <html>
 <head><meta charset="utf-8" />
 
-<title>dc7_ctx_dseg_top_314_donors</title>
+<title>qc5_ctx_donor</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
@@ -13077,21 +13077,7 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h1>Define Donor Segment Context &ndash; Top Contributors to the 314 PAC</h1>
-<h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Explore the FEC data by specifying SQL predicates that identify <strong>Donor Segments</strong>, which are static lists of Donor (<code>donor_indiv</code> view) records.  Note that a Donor Segment context may including one <em>or more</em> segments (e.g. by name or ID).  As with Donor contexts, Donor identities <strong><em>are</em></strong> discernible within queries using this context type.</p>
-<p>For this notebook, we will create a Donor Segment based on top contributors to the 314 PAC.  This is a simpler example than shown in <code>dc6</code>, but is included to represent a common use case of manually creating a Donor Segment and setting a query context in which to explore the collective giving patterns for the included members.</p>
-<p>This approach will create the following query contexts:</p>
-<p><strong>Principal Context View</strong></p>
-<ul>
-<li><code>ctx_dseg</code></li>
-</ul>
-<p><strong>Dependent Context Views</strong></p>
-<ul>
-<li><code>ctx_dseg_memb</code></li>
-<li><code>ctx_donor</code></li>
-<li><code>ctx_indiv</code></li>
-<li><code>ctx_contrib</code> (with <code>donor_indiv_id</code>)</li>
-</ul>
+<h1 id="Query-by-Donor-Context">Query by Donor Context<a class="anchor-link" href="#Query-by-Donor-Context">&#182;</a></h1><h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Query based on <code>ctx_donor</code> view</p>
 
 </div>
 </div>
@@ -13099,11 +13085,13 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Notebook-Setup">Notebook Setup<a class="anchor-link" href="#Notebook-Setup">&#182;</a></h2><ul>
-<li>Configure database connect information and options</li>
-<li>Clear potentially interfering context (PostgreSQL doesn't let you replace a view definition with conflicting column names)</li>
-<li>Set styling for notebook</li>
-</ul>
+<h2 id="Notebook-Setup">Notebook Setup<a class="anchor-link" href="#Notebook-Setup">&#182;</a></h2><h3 id="Configure-database-connect-info/options">Configure database connect info/options<a class="anchor-link" href="#Configure-database-connect-info/options">&#182;</a></h3><p>Note: database connect string can be specified on the initial <code>%sql</code> command:</p>
+<div class="highlight"><pre><span></span><span class="n">database_url</span> <span class="o">=</span> <span class="s2">&quot;postgresql+psycopg2://user@localhost/fecdb&quot;</span>
+<span class="o">%</span><span class="n">sql</span> <span class="err">$</span><span class="n">database_url</span>
+</pre></div>
+<p>Or, connect string is taken from DATABASE_URL environment variable (if not specified for <code>%sql</code>):</p>
+<div class="highlight"><pre><span></span><span class="o">%</span><span class="n">sql</span>
+</pre></div>
 
 </div>
 </div>
@@ -13113,12 +13101,11 @@ div#notebook {
 <div class="prompt input_prompt">In&nbsp;[1]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="n">sqlconnect</span> <span class="o">=</span> <span class="s2">&quot;postgresql+psycopg2://crash@localhost/fecdb&quot;</span>
-
-<span class="o">%</span><span class="k">load_ext</span> sql
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">load_ext</span> sql
 <span class="o">%</span><span class="k">config</span> SqlMagic.autopandas=True
 <span class="o">%</span><span class="k">config</span> InteractiveShell.ast_node_interactivity=&#39;last_expr_or_assign&#39;
-<span class="o">%</span><span class="k">sql</span> $sqlconnect
+<span class="c1"># connect string taken from DATABASE_URL environment variable</span>
+<span class="o">%</span><span class="k">sql</span>
 </pre></div>
 
     </div>
@@ -13146,94 +13133,16 @@ div#notebook {
 </div>
 
 </div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Set-styling">Set styling<a class="anchor-link" href="#Set-styling">&#182;</a></h3>
+</div>
+</div>
+</div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">In&nbsp;[2]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> drop view if exists ctx_contrib   cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_indiv     cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_donor     cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg_memb cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_iseg      cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg_memb cascade
-<span class="o">%</span><span class="k">sql</span> drop view if exists ctx_dseg      cascade
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[2]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[3]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%html</span>
@@ -13276,16 +13185,29 @@ Done.
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Create-Donor-Segment-for-Top-314-Donors">Create Donor Segment for Top 314 Donors<a class="anchor-link" href="#Create-Donor-Segment-for-Top-314-Donors">&#182;</a></h2>
+<h3 id="Import-plotting-modules">Import plotting modules<a class="anchor-link" href="#Import-plotting-modules">&#182;</a></h3>
 </div>
 </div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[3]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">matplotlib</span> inline
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">seaborn</span> <span class="k">as</span> <span class="nn">sns</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
 </div>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Clear out the segment and underlying view(s) used below, if previously created.</p>
-<p>For now, let's leave <code>indiv_group</code> in place, if existing (i.e. created by <code>dc6</code>), since it's kind of expensive to create, and isn't going to be changing on us at this point (since it is really just a stand-in for more sophistocated logic to come).</p>
-
+<h2 id="Validate-Context">Validate Context<a class="anchor-link" href="#Validate-Context">&#182;</a></h2>
 </div>
 </div>
 </div>
@@ -13294,9 +13216,9 @@ Done.
 <div class="prompt input_prompt">In&nbsp;[4]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> delete from donor_seg where name = &#39;Top 314 Donors&#39;
-<span class="o">%</span><span class="k">sql</span> drop materialized view if exists donor_sum_314 cascade
-<span class="c1">#%sql drop materialized view if exists indiv_group cascade</span>
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select count(*)
+  from ctx_donor
 </pre></div>
 
     </div>
@@ -13315,8 +13237,6 @@ Done.
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
 1 rows affected.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
 </pre>
 </div>
 </div>
@@ -13346,9 +13266,14 @@ Done.
   <thead>
     <tr style="text-align: right;">
       <th></th>
+      <th>count</th>
     </tr>
   </thead>
   <tbody>
+    <tr>
+      <td>0</td>
+      <td>63</td>
+    </tr>
   </tbody>
 </table>
 </div>
@@ -13363,8 +13288,14 @@ Done.
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>As stated above, we will re-use the current definition/contents of this view, if previously created (see <code>dc6</code> for a description of the logic here).</p>
-
+<h2 id="Queries-/-Use-Cases">Queries / Use Cases<a class="anchor-link" href="#Queries-/-Use-Cases">&#182;</a></h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Plot-Election-Cycle-Giving-Patterns">Plot Election Cycle Giving Patterns<a class="anchor-link" href="#Plot-Election-Cycle-Giving-Patterns">&#182;</a></h3><h4 id="Setup-use-case">Setup use case<a class="anchor-link" href="#Setup-use-case">&#182;</a></h4>
 </div>
 </div>
 </div>
@@ -13373,19 +13304,8 @@ Done.
 <div class="prompt input_prompt">In&nbsp;[5]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create materialized view if not exists indiv_group as
-select ip.part1                  as last_name,
-       substr(ip.part2, 1, 3)    as first_name_pfx,
-       substr(ip.zip_code, 1, 3) as zip_pfx,
-       count(distinct ip.id)     as indivs,
-       array_agg(distinct ip.id) as indiv_ids
-  from indiv_parsed ip
- where ip.name ~ &#39;^[A-Z][^,]&#39;
-   and ip.zip_code is not null
-   and ip.num_parts &gt; 1
-   and ip.part1 !~ &#39; &#39;
- group by 1, 2, 3
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> drop materialized view if exists donor_ec_sum cascade
+<span class="o">%</span><span class="k">sql</span> drop materialized view if exists donor_ec_contrib cascade
 </pre></div>
 
     </div>
@@ -13403,6 +13323,8 @@ select ip.part1                  as last_name,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
+Done.
+ * postgresql+psycopg2://crash@localhost/fecdb
 Done.
 </pre>
 </div>
@@ -13450,8 +13372,7 @@ Done.
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Create a view to represent <code>indiv_contrib</code> records associated with any committee whose name is prefixed by "314" (this qualification can be amended if there are other patterns representing the same PAC; currently there are no others with "314" elsewhere in the name)</p>
-<p>Note that this serves as a template for creating other segments of contributions, and hence the Donors (or Inidividuals, if wanting to create an Individual Segment instead) behind them, for doing a similar type of investigation</p>
+<p>This view rerepsents all of the contributions from the party/parties specified by <code>ctx_donor</code>; note that multiple contributions on a given day (if/when it happens) are lumped together as <code>contrib_dt</code>, to make the overall reporting simpler.</p>
 
 </div>
 </div>
@@ -13462,13 +13383,21 @@ Done.
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view contrib_to_314 as
-select cm.cmte_nm,
-       ic.*
-  from cmte cm
-  join indiv_contrib ic
-       on ic.cmte_id = cm.cmte_id
- where cm.cmte_nm like &#39;314%&#39;
+create materialized view donor_ec_contrib as
+select ic.elect_cycle                                           as elect_cycle,
+       ic.transaction_dt                                        as contrib_dt,
+       sum(ic.transaction_amt)                                  as contrib_amt,
+       count(*)                                                 as contribs,
+       count(distinct i.name)                                   as donors,
+       array_to_string(array_agg(distinct cmte.cmte_id), &#39;, &#39;)  as cmte_ids,
+       array_to_string(array_agg(distinct cmte.cmte_nm), &#39; | &#39;) as cmte_nms
+  from ctx_donor dx
+  join indiv i on i.donor_indiv_id = dx.id
+  join indiv_contrib ic on ic.indiv_id = i.id
+  left join cmte
+       on cmte.cmte_id = ic.cmte_id
+       and cmte.elect_cycle = ic.elect_cycle
+ group by 1, 2
 </pre></div>
 
     </div>
@@ -13486,7 +13415,7 @@ select cm.cmte_nm,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
+4296 rows affected.
 </pre>
 </div>
 </div>
@@ -13533,8 +13462,7 @@ Done.
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>As in <code>dc6</code>, we now create a view summarizing the contributions of the Individual groupings (i.e. approximation of Donors).  The aggregation for each "Donor" includes the list of consolidated <code>indiv_id</code> keys, the total number of contributions, and the total and average amounts.</p>
-<p>SQL design note: not obvious whether it is better to re-aggregate the unnested ids (even though we are not able to omit the <code>distinct</code> qualifier), or select <code>ig.indiv_ids</code> and add to GROUP BY clause&mdash;voting for the former option right now...</p>
+<p>Aggregate ("summarize") the previous data by election cycle, showing the earliest and latest contributions for each cycle; note that <code>days_rel</code> represents days relative to the election date for the cycle (it goes without saying that negative is "before" the election date, and positive is "after").</p>
 
 </div>
 </div>
@@ -13545,29 +13473,19 @@ Done.
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create materialized view donor_sum_314 as
-with indiv_group_memb as (
-    select ig.last_name,
-           ig.first_name_pfx,
-           ig.zip_pfx,
-           --ig.indiv_ids,
-           unnest(ig.indiv_ids) as indiv_id
-      from indiv_group ig
-)
-select igm.last_name,
-       igm.first_name_pfx,
-       igm.zip_pfx,
-       array_agg(distinct igm.indiv_id)
-                                 as indiv_ids,
-       count(ct.transaction_amt) as contribs,
-       sum(ct.transaction_amt)   as total_amt,
-       round(sum(ct.transaction_amt) / count(ct.transaction_amt), 2)
-                                 as avg_amt,
-       array_agg(distinct ct.elect_cycle)
-                                 as elect_cycles
-  from indiv_group_memb igm
-  join contrib_to_314 ct on ct.indiv_id = igm.indiv_id
- group by 1, 2, 3
+create materialized view donor_ec_sum as
+select ec.key                                    as key,
+       ec.election_day                           as election_day,
+       count(*)                                  as contrib_dates,
+       sum(bec.contrib_amt)                      as total_amt,
+       round(sum(bec.contrib_amt) / count(*), 2) as avg_amt,
+       min(bec.contrib_dt)                       as earliest,
+       max(bec.contrib_dt)                       as latest,
+       min(bec.contrib_dt) - ec.election_day     as erly_days_rel,
+       max(bec.contrib_dt) - ec.election_day     as late_days_rel
+  from donor_ec_contrib bec
+  join election_cycle ec on ec.key = bec.elect_cycle
+ group by 1, 2
 </pre></div>
 
     </div>
@@ -13585,7 +13503,7 @@ select igm.last_name,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-2438 rows affected.
+11 rows affected.
 </pre>
 </div>
 </div>
@@ -13632,7 +13550,7 @@ select igm.last_name,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Create a couple of indexes for performance.</p>
+<p>Take a look at the summary just computed.</p>
 
 </div>
 </div>
@@ -13642,8 +13560,10 @@ select igm.last_name,
 <div class="prompt input_prompt">In&nbsp;[8]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">sql</span> create index donor_sum_314_total_amt on donor_sum_314 (total_amt)
-<span class="o">%</span><span class="k">sql</span> create index donor_sum_314_avg_amt on donor_sum_314 (avg_amt)
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select *
+  from donor_ec_sum
+ order by 1
 </pre></div>
 
     </div>
@@ -13661,9 +13581,7 @@ select igm.last_name,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
- * postgresql+psycopg2://crash@localhost/fecdb
-Done.
+11 rows affected.
 </pre>
 </div>
 </div>
@@ -13693,9 +13611,150 @@ Done.
   <thead>
     <tr style="text-align: right;">
       <th></th>
+      <th>key</th>
+      <th>election_day</th>
+      <th>contrib_dates</th>
+      <th>total_amt</th>
+      <th>avg_amt</th>
+      <th>earliest</th>
+      <th>latest</th>
+      <th>erly_days_rel</th>
+      <th>late_days_rel</th>
     </tr>
   </thead>
   <tbody>
+    <tr>
+      <td>0</td>
+      <td>2000</td>
+      <td>2000-11-07</td>
+      <td>295</td>
+      <td>6882505.00</td>
+      <td>23330.53</td>
+      <td>1999-01-11</td>
+      <td>2000-12-31</td>
+      <td>-666</td>
+      <td>54</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>2002</td>
+      <td>2002-11-05</td>
+      <td>312</td>
+      <td>32106740.00</td>
+      <td>102906.22</td>
+      <td>2001-01-03</td>
+      <td>2002-12-23</td>
+      <td>-671</td>
+      <td>48</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>2004</td>
+      <td>2004-11-02</td>
+      <td>335</td>
+      <td>28080591.00</td>
+      <td>83822.66</td>
+      <td>2003-01-21</td>
+      <td>2004-12-31</td>
+      <td>-651</td>
+      <td>59</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>2006</td>
+      <td>2006-11-07</td>
+      <td>345</td>
+      <td>33215996.00</td>
+      <td>96278.25</td>
+      <td>2005-01-04</td>
+      <td>2006-12-29</td>
+      <td>-672</td>
+      <td>52</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>2008</td>
+      <td>2008-11-04</td>
+      <td>386</td>
+      <td>15334856.00</td>
+      <td>39727.61</td>
+      <td>2006-03-08</td>
+      <td>2009-09-28</td>
+      <td>-972</td>
+      <td>328</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>2010</td>
+      <td>2010-11-02</td>
+      <td>404</td>
+      <td>105298333.00</td>
+      <td>260639.44</td>
+      <td>2007-01-01</td>
+      <td>2010-12-31</td>
+      <td>-1401</td>
+      <td>59</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>2012</td>
+      <td>2012-11-06</td>
+      <td>448</td>
+      <td>291771883.00</td>
+      <td>651276.52</td>
+      <td>2011-01-01</td>
+      <td>2012-12-31</td>
+      <td>-675</td>
+      <td>55</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>2014</td>
+      <td>2014-11-04</td>
+      <td>463</td>
+      <td>201218838.00</td>
+      <td>434597.92</td>
+      <td>2012-06-02</td>
+      <td>2014-12-31</td>
+      <td>-885</td>
+      <td>57</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>2016</td>
+      <td>2016-11-08</td>
+      <td>554</td>
+      <td>722705756.00</td>
+      <td>1304523.03</td>
+      <td>2015-01-12</td>
+      <td>2016-12-31</td>
+      <td>-666</td>
+      <td>53</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>2018</td>
+      <td>2018-11-06</td>
+      <td>591</td>
+      <td>665768670.00</td>
+      <td>1126512.13</td>
+      <td>2016-09-06</td>
+      <td>2018-12-31</td>
+      <td>-791</td>
+      <td>55</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>2020</td>
+      <td>2020-11-03</td>
+      <td>163</td>
+      <td>72061769.00</td>
+      <td>442096.74</td>
+      <td>2018-06-26</td>
+      <td>2019-07-31</td>
+      <td>-861</td>
+      <td>-461</td>
+    </tr>
   </tbody>
 </table>
 </div>
@@ -13710,7 +13769,14 @@ Done.
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Let's inspect the top 50 "Donors" (the actual Donor records not yet created) by total contribution amount.  This is the list that we will create our segment from.</p>
+<h4 id="Execute-query-and-plot">Execute query and plot<a class="anchor-link" href="#Execute-query-and-plot">&#182;</a></h4><p>For each of the contributions in <code>donor_ec_contrib</code>, we now query for the following:</p>
+<ul>
+<li><code>cycle_pct</code>: percentage of the total for the cycle</li>
+<li><code>cumul_cycle_amt</code>: cumulative amount for the cycle</li>
+<li><code>cumul_cycle_pct</code>: cumulative percentage for the cycle</li>
+<li><code>days_rel</code>: days before/after election date</li>
+</ul>
+<p>We save the results into a local DataFrame for graphical visualization below.</p>
 
 </div>
 </div>
@@ -13720,11 +13786,29 @@ Done.
 <div class="prompt input_prompt">In&nbsp;[9]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select *
-  from donor_sum_314
- order by total_amt desc, contribs desc
- limit 50
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span> result &lt;&lt;
+select bec.elect_cycle,
+       bec.contrib_dt,
+       bec.contrib_amt                   as total_amt,
+       round(bec.contrib_amt / bes.total_amt * 100.0, 1)
+                                         as cycle_pct,
+       cumul.total_amt                   as cumul_cycle_amt,
+       round(cumul.total_amt / bes.total_amt * 100.0, 1)
+                                         as cumul_cycle_pct,
+       bec.contrib_dt - bes.election_day as days_rel
+  from donor_ec_contrib bec
+  join donor_ec_sum bes on bes.key = bec.elect_cycle
+  left join lateral
+       (select count(*)                as contribs,
+               nullif(count(*) - 1, 0) as intervals,
+               sum(bec2.contrib_amt)   as total_amt,
+               max(bec2.contrib_dt) - min(bec2.contrib_dt)
+                                       as elapsed_days
+          from donor_ec_contrib bec2
+         where bec2.elect_cycle = bec.elect_cycle
+           and bec2.contrib_dt &lt;= bec.contrib_dt
+       ) as cumul on true
+ order by 1, 2
 </pre></div>
 
     </div>
@@ -13742,602 +13826,10 @@ select *
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@localhost/fecdb
-50 rows affected.
+4296 rows affected.
+Returning data to local variable result
 </pre>
 </div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[9]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>last_name</th>
-      <th>first_name_pfx</th>
-      <th>zip_pfx</th>
-      <th>indiv_ids</th>
-      <th>contribs</th>
-      <th>total_amt</th>
-      <th>avg_amt</th>
-      <th>elect_cycles</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>STOREY</td>
-      <td>BAY</td>
-      <td>191</td>
-      <td>[11659801]</td>
-      <td>21</td>
-      <td>240000.00</td>
-      <td>11428.57</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>ROSZAK</td>
-      <td>MAT</td>
-      <td>600</td>
-      <td>[10325529]</td>
-      <td>2</td>
-      <td>204562.00</td>
-      <td>102281.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>PROCKOP</td>
-      <td>DAR</td>
-      <td>191</td>
-      <td>[9683572]</td>
-      <td>2</td>
-      <td>200000.00</td>
-      <td>100000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>PARK</td>
-      <td>TOD</td>
-      <td>940</td>
-      <td>[9188602]</td>
-      <td>2</td>
-      <td>200000.00</td>
-      <td>100000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>SHENKER</td>
-      <td>SCO</td>
-      <td>947</td>
-      <td>[10979072]</td>
-      <td>7</td>
-      <td>105500.00</td>
-      <td>15071.43</td>
-      <td>[2014, 2018]</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>GIRARDI</td>
-      <td>THO</td>
-      <td>900</td>
-      <td>[4336953]</td>
-      <td>4</td>
-      <td>100000.00</td>
-      <td>25000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>NASH</td>
-      <td>RIC</td>
-      <td>598</td>
-      <td>[8656333]</td>
-      <td>2</td>
-      <td>100000.00</td>
-      <td>50000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>7</td>
-      <td>ABRAMSON</td>
-      <td>RON</td>
-      <td>200</td>
-      <td>[28429]</td>
-      <td>4</td>
-      <td>50000.00</td>
-      <td>12500.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>8</td>
-      <td>TAYLOR</td>
-      <td>DAL</td>
-      <td>606</td>
-      <td>[11902785]</td>
-      <td>2</td>
-      <td>50000.00</td>
-      <td>25000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>9</td>
-      <td>LARSEN</td>
-      <td>CHR</td>
-      <td>941</td>
-      <td>[6822374]</td>
-      <td>2</td>
-      <td>50000.00</td>
-      <td>25000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>10</td>
-      <td>MORGAN</td>
-      <td>HOW</td>
-      <td>100</td>
-      <td>[8417423]</td>
-      <td>2</td>
-      <td>50000.00</td>
-      <td>25000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>11</td>
-      <td>SOLIMAN</td>
-      <td>KAR</td>
-      <td>926</td>
-      <td>[11356137]</td>
-      <td>2</td>
-      <td>49890.00</td>
-      <td>24945.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>12</td>
-      <td>MCEVOY</td>
-      <td>NIO</td>
-      <td>941</td>
-      <td>[7863787]</td>
-      <td>42</td>
-      <td>42966.00</td>
-      <td>1023.00</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>13</td>
-      <td>KAHN</td>
-      <td>RON</td>
-      <td>941</td>
-      <td>[6110433, 6110440]</td>
-      <td>13</td>
-      <td>42000.00</td>
-      <td>3230.77</td>
-      <td>[2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>14</td>
-      <td>PARK</td>
-      <td>DAV</td>
-      <td>940</td>
-      <td>[9165471]</td>
-      <td>4</td>
-      <td>40312.00</td>
-      <td>10078.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>15</td>
-      <td>TORRES</td>
-      <td>TOM</td>
-      <td>770</td>
-      <td>[12143213]</td>
-      <td>36</td>
-      <td>36000.00</td>
-      <td>1000.00</td>
-      <td>[2014, 2016]</td>
-    </tr>
-    <tr>
-      <td>16</td>
-      <td>NEGROPONTE</td>
-      <td>NIC</td>
-      <td>021</td>
-      <td>[8688914]</td>
-      <td>2</td>
-      <td>22378.00</td>
-      <td>11189.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>17</td>
-      <td>BASSI</td>
-      <td>STE</td>
-      <td>920</td>
-      <td>[678448]</td>
-      <td>2</td>
-      <td>20466.00</td>
-      <td>10233.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>18</td>
-      <td>GROSSBLATT</td>
-      <td>DAV</td>
-      <td>941</td>
-      <td>[4684620]</td>
-      <td>2</td>
-      <td>20230.00</td>
-      <td>10115.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>19</td>
-      <td>CUELLAR</td>
-      <td>CLI</td>
-      <td>984</td>
-      <td>[2576925]</td>
-      <td>12</td>
-      <td>20050.00</td>
-      <td>1670.83</td>
-      <td>[2020]</td>
-    </tr>
-    <tr>
-      <td>20</td>
-      <td>LAWRENCE</td>
-      <td>FRA</td>
-      <td>640</td>
-      <td>[6872845]</td>
-      <td>6</td>
-      <td>20010.00</td>
-      <td>3335.00</td>
-      <td>[2020]</td>
-    </tr>
-    <tr>
-      <td>21</td>
-      <td>SWINDELL</td>
-      <td>DAV</td>
-      <td>021</td>
-      <td>[11823232]</td>
-      <td>4</td>
-      <td>20000.00</td>
-      <td>5000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>22</td>
-      <td>PROOPS</td>
-      <td>JAY</td>
-      <td>598</td>
-      <td>[9688035]</td>
-      <td>2</td>
-      <td>20000.00</td>
-      <td>10000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>23</td>
-      <td>GURAL</td>
-      <td>JEF</td>
-      <td>100</td>
-      <td>[4745356]</td>
-      <td>2</td>
-      <td>20000.00</td>
-      <td>10000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>24</td>
-      <td>SHOCH</td>
-      <td>JOH</td>
-      <td>940</td>
-      <td>[11024692]</td>
-      <td>2</td>
-      <td>20000.00</td>
-      <td>10000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>25</td>
-      <td>HONARKAR</td>
-      <td>MOH</td>
-      <td>926</td>
-      <td>[5486301]</td>
-      <td>2</td>
-      <td>20000.00</td>
-      <td>10000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>26</td>
-      <td>BYERS</td>
-      <td>BRO</td>
-      <td>940</td>
-      <td>[1661575]</td>
-      <td>2</td>
-      <td>20000.00</td>
-      <td>10000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>27</td>
-      <td>HUDSON</td>
-      <td>BRU</td>
-      <td>132</td>
-      <td>[5601495]</td>
-      <td>6</td>
-      <td>18000.00</td>
-      <td>3000.00</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>28</td>
-      <td>JHONG</td>
-      <td>EUG</td>
-      <td>940</td>
-      <td>[5902719]</td>
-      <td>2</td>
-      <td>16604.00</td>
-      <td>8302.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>29</td>
-      <td>KARPLUS</td>
-      <td>BAR</td>
-      <td>913</td>
-      <td>[6169689]</td>
-      <td>4</td>
-      <td>16000.00</td>
-      <td>4000.00</td>
-      <td>[2020]</td>
-    </tr>
-    <tr>
-      <td>30</td>
-      <td>GOLLON</td>
-      <td>PET</td>
-      <td>117</td>
-      <td>[4435025]</td>
-      <td>18</td>
-      <td>15900.00</td>
-      <td>883.33</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>31</td>
-      <td>NORTON</td>
-      <td>JAC</td>
-      <td>100</td>
-      <td>[8848719, 8848720, 8848731]</td>
-      <td>18</td>
-      <td>15700.00</td>
-      <td>872.22</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>32</td>
-      <td>GILBERT</td>
-      <td>JOH</td>
-      <td>024</td>
-      <td>[4293837]</td>
-      <td>90</td>
-      <td>15450.00</td>
-      <td>171.67</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>33</td>
-      <td>KAPER</td>
-      <td>TAS</td>
-      <td>019</td>
-      <td>[6147085]</td>
-      <td>10</td>
-      <td>15000.00</td>
-      <td>1500.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>34</td>
-      <td>LEVINSON</td>
-      <td>FRA</td>
-      <td>949</td>
-      <td>[7037936]</td>
-      <td>3</td>
-      <td>15000.00</td>
-      <td>5000.00</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>35</td>
-      <td>BEEUWKES</td>
-      <td>REI</td>
-      <td>017</td>
-      <td>[779629]</td>
-      <td>3</td>
-      <td>15000.00</td>
-      <td>5000.00</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>36</td>
-      <td>KIRK</td>
-      <td>CLA</td>
-      <td>100</td>
-      <td>[6433238, 6433258]</td>
-      <td>8</td>
-      <td>14500.00</td>
-      <td>1812.50</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>37</td>
-      <td>JENCKS</td>
-      <td>CHR</td>
-      <td>021</td>
-      <td>[5870457]</td>
-      <td>42</td>
-      <td>14320.00</td>
-      <td>340.95</td>
-      <td>[2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>38</td>
-      <td>FERSTER</td>
-      <td>DAV</td>
-      <td>600</td>
-      <td>[3678807]</td>
-      <td>6</td>
-      <td>13500.00</td>
-      <td>2250.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>39</td>
-      <td>NIELSEN</td>
-      <td>SHE</td>
-      <td>600</td>
-      <td>[8793106]</td>
-      <td>60</td>
-      <td>13238.00</td>
-      <td>220.63</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>40</td>
-      <td>HORLICK</td>
-      <td>SUS</td>
-      <td>323</td>
-      <td>[5515167]</td>
-      <td>60</td>
-      <td>11716.00</td>
-      <td>195.27</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>41</td>
-      <td>TUSK</td>
-      <td>BRA</td>
-      <td>100</td>
-      <td>[12265351]</td>
-      <td>2</td>
-      <td>10800.00</td>
-      <td>5400.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>42</td>
-      <td>FORDE</td>
-      <td>JAM</td>
-      <td>927</td>
-      <td>[3850042]</td>
-      <td>2</td>
-      <td>10800.00</td>
-      <td>5400.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>43</td>
-      <td>BERG</td>
-      <td>FRE</td>
-      <td>045</td>
-      <td>[877907]</td>
-      <td>6</td>
-      <td>10260.00</td>
-      <td>1710.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>44</td>
-      <td>MOUNT</td>
-      <td>PHY</td>
-      <td>064</td>
-      <td>[8496236]</td>
-      <td>10</td>
-      <td>10092.00</td>
-      <td>1009.20</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>45</td>
-      <td>POWERS</td>
-      <td>ANN</td>
-      <td>960</td>
-      <td>[9625220]</td>
-      <td>10</td>
-      <td>10000.00</td>
-      <td>1000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>46</td>
-      <td>HALL</td>
-      <td>CLA</td>
-      <td>145</td>
-      <td>[4828088]</td>
-      <td>4</td>
-      <td>10000.00</td>
-      <td>2500.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>47</td>
-      <td>BLUE</td>
-      <td>ALL</td>
-      <td>902</td>
-      <td>[1083690]</td>
-      <td>2</td>
-      <td>10000.00</td>
-      <td>5000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>48</td>
-      <td>FRIEDMAN</td>
-      <td>DON</td>
-      <td>294</td>
-      <td>[3993057]</td>
-      <td>2</td>
-      <td>10000.00</td>
-      <td>5000.00</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>49</td>
-      <td>FRIEDMAN</td>
-      <td>RAN</td>
-      <td>294</td>
-      <td>[3997846]</td>
-      <td>2</td>
-      <td>10000.00</td>
-      <td>5000.00</td>
-      <td>[2018]</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
 </div>
 
 </div>
@@ -14347,7 +13839,7 @@ select *
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Now we use <code>create_donor_seg</code> function to create the segment based on the query we just executed.  This step also creates the actual underlying Donor records from the groupings determined by <code>indiv_group</code>.</p>
+<p>Plot cumulative amount given relative to election day (each color represents a different election cycle)</p>
 
 </div>
 </div>
@@ -14357,15 +13849,11 @@ select *
 <div class="prompt input_prompt">In&nbsp;[10]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-with donor_set as (
-    select row(indiv_ids)::id_array as ids
-      from donor_sum_314
-     order by total_amt desc, contribs desc
-     limit 50
-)
-select create_donor_seg(array_agg(ids), &#39;Top 314 Donors&#39;) as seg_id
-  from donor_set
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;days_rel&#39;</span><span class="p">]</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;cumul_cycle_amt&#39;</span><span class="p">]</span>
+<span class="n">z</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;elect_cycle&#39;</span><span class="p">]</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="n">z</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
 </pre></div>
 
     </div>
@@ -14378,52 +13866,28 @@ select create_donor_seg(array_agg(ids), &#39;Top 314 Donors&#39;) as seg_id
 
 <div class="output_area">
 
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-1 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
     <div class="prompt output_prompt">Out[10]:</div>
 
 
 
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
 
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>seg_id</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>159</td>
-    </tr>
-  </tbody>
-</table>
+<div class="output_text output_subarea output_execute_result">
+<pre>&lt;matplotlib.collections.PathCollection at 0x7f60e999b208&gt;</pre>
 </div>
+
+</div>
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_png output_subarea ">
+<img src="data:image/png;base64,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
+"
+>
 </div>
 
 </div>
@@ -14435,7 +13899,8 @@ select create_donor_seg(array_agg(ids), &#39;Top 314 Donors&#39;) as seg_id
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Create-Context-Views">Create Context Views<a class="anchor-link" href="#Create-Context-Views">&#182;</a></h2><h3 id="Create-ctx_dseg">Create <code>ctx_dseg</code><a class="anchor-link" href="#Create-ctx_dseg">&#182;</a></h3>
+<p>Plot cumulative percentage (for the cycle) given relative to election day (again, each color represents a different election cycle)</p>
+
 </div>
 </div>
 </div>
@@ -14444,13 +13909,11 @@ select create_donor_seg(array_agg(ids), &#39;Top 314 Donors&#39;) as seg_id
 <div class="prompt input_prompt">In&nbsp;[11]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_dseg as
-select id,
-       name,
-       description
-  from donor_seg ds
- where ds.name = &#39;Top 314 Donors&#39;
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;days_rel&#39;</span><span class="p">]</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;cumul_cycle_pct&#39;</span><span class="p">]</span>
+<span class="n">z</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;elect_cycle&#39;</span><span class="p">]</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="n">z</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
 </pre></div>
 
     </div>
@@ -14460,18 +13923,6 @@ select id,
 <div class="output_wrapper">
 <div class="output">
 
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
 
 <div class="output_area">
 
@@ -14479,31 +13930,24 @@ Done.
 
 
 
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
 
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
+<div class="output_text output_subarea output_execute_result">
+<pre>&lt;matplotlib.collections.PathCollection at 0x7f60e74aeba8&gt;</pre>
 </div>
+
+</div>
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_png output_subarea ">
+<img src="data:image/png;base64,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
+"
+>
 </div>
 
 </div>
@@ -14511,15 +13955,25 @@ Done.
 </div>
 </div>
 
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Plot individual contributions (as a percentage for the cycle) relative to election day (again, each color represents a different election cycle); it is interesting to see when in the cycle significant contributions (on the order of a few percentage points or more--in some cases, much more!) have been given.</p>
+
+</div>
+</div>
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">In&nbsp;[12]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select *
-  from ctx_dseg
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;days_rel&#39;</span><span class="p">]</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;cycle_pct&#39;</span><span class="p">]</span>
+<span class="n">z</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;elect_cycle&#39;</span><span class="p">]</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="n">z</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
 </pre></div>
 
     </div>
@@ -14529,18 +13983,6 @@ select *
 <div class="output_wrapper">
 <div class="output">
 
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-1 rows affected.
-</pre>
-</div>
-</div>
 
 <div class="output_area">
 
@@ -14548,2142 +13990,24 @@ select *
 
 
 
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
 
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>id</th>
-      <th>name</th>
-      <th>description</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>159</td>
-      <td>Top 314 Donors</td>
-      <td>None</td>
-    </tr>
-  </tbody>
-</table>
-</div>
+<div class="output_text output_subarea output_execute_result">
+<pre>&lt;matplotlib.collections.PathCollection at 0x7f60e741c5f8&gt;</pre>
 </div>
 
 </div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Create-ctx_dseg_memb">Create <code>ctx_dseg_memb</code><a class="anchor-link" href="#Create-ctx_dseg_memb">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[13]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_dseg_memb as
-select dsm.*
-  from ctx_dseg dsx
-  join donor_seg_memb dsm on dsm.donor_seg_id = dsx.id
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
 
 <div class="output_area">
 
     <div class="prompt"></div>
 
 
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
 
-<div class="output_area">
 
-    <div class="prompt output_prompt">Out[13]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[14]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select ds.name as dseg_name,
-       d.name  as indiv_name,
-       d.city,
-       d.state,
-       d.zip_code,
-       d.elect_cycles
-  from ctx_dseg_memb dsmx
-  join donor_seg ds on ds.id = dsmx.donor_seg_id
-  join donor_indiv d on d.id = dsmx.donor_indiv_id
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-50 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[14]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>dseg_name</th>
-      <th>indiv_name</th>
-      <th>city</th>
-      <th>state</th>
-      <th>zip_code</th>
-      <th>elect_cycles</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>Top 314 Donors</td>
-      <td>STOREY, BAYARD T PH.D.</td>
-      <td>PHILADELPHIA</td>
-      <td>PA</td>
-      <td>191303202</td>
-      <td>[2006, 2014, 2016]</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>Top 314 Donors</td>
-      <td>ROSZAK, MATTHEW</td>
-      <td>WINNETKA</td>
-      <td>IL</td>
-      <td>600933630</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>Top 314 Donors</td>
-      <td>PROCKOP, DARWIN J. MD, PHD</td>
-      <td>PHILADELPHIA</td>
-      <td>PA</td>
-      <td>191063913</td>
-      <td>[2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>Top 314 Donors</td>
-      <td>PARK, TODD</td>
-      <td>LOS ALTOS HILLS</td>
-      <td>CA</td>
-      <td>940223385</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>Top 314 Donors</td>
-      <td>SHENKER, SCOTT</td>
-      <td>BERKELEY</td>
-      <td>CA</td>
-      <td>947072052</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>Top 314 Donors</td>
-      <td>GIRARDI, THOMAS V.</td>
-      <td>LOS ANGELES</td>
-      <td>CA</td>
-      <td>900171904</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>Top 314 Donors</td>
-      <td>NASH, RICHARD</td>
-      <td>MISSOULA</td>
-      <td>MT</td>
-      <td>598045862</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>7</td>
-      <td>Top 314 Donors</td>
-      <td>ABRAMSON, RONALD</td>
-      <td>WASHINGTON</td>
-      <td>DC</td>
-      <td>200063807</td>
-      <td>[2012, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>8</td>
-      <td>Top 314 Donors</td>
-      <td>TAYLOR, DALE</td>
-      <td>CHICAGO</td>
-      <td>IL</td>
-      <td>606146085</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>9</td>
-      <td>Top 314 Donors</td>
-      <td>LARSEN, CHRIS</td>
-      <td>SAN FRANCISCO</td>
-      <td>CA</td>
-      <td>941091512</td>
-      <td>[2010, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>10</td>
-      <td>Top 314 Donors</td>
-      <td>MORGAN, HOWARD L.</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>100657253</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>11</td>
-      <td>Top 314 Donors</td>
-      <td>SOLIMAN, KARL</td>
-      <td>IRVINE</td>
-      <td>CA</td>
-      <td>926127186</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>12</td>
-      <td>Top 314 Donors</td>
-      <td>MCEVOY, NION</td>
-      <td>SAN FRANCISCO</td>
-      <td>CA</td>
-      <td>94118</td>
-      <td>[2002, 2004, 2006, 2008, 2010, 2012, 2014, 201...</td>
-    </tr>
-    <tr>
-      <td>13</td>
-      <td>Top 314 Donors</td>
-      <td>KAHN, RONALD N</td>
-      <td>SAN FRANCISCO</td>
-      <td>CA</td>
-      <td>941590599</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>14</td>
-      <td>Top 314 Donors</td>
-      <td>PARK, DAVID</td>
-      <td>LOS ALTOS</td>
-      <td>CA</td>
-      <td>940223838</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>15</td>
-      <td>Top 314 Donors</td>
-      <td>TORRES, TOMAS</td>
-      <td>HOUSTON</td>
-      <td>TX</td>
-      <td>770653124</td>
-      <td>[2012, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>16</td>
-      <td>Top 314 Donors</td>
-      <td>NEGROPONTE, NICHOLAS</td>
-      <td>CAMBRIDGE</td>
-      <td>MA</td>
-      <td>021421322</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>17</td>
-      <td>Top 314 Donors</td>
-      <td>BASSI, STEVE</td>
-      <td>CARLSBAD</td>
-      <td>CA</td>
-      <td>920081900</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>18</td>
-      <td>Top 314 Donors</td>
-      <td>GROSSBLATT, DAVID</td>
-      <td>SAN FRANCISCO</td>
-      <td>CA</td>
-      <td>941074317</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>19</td>
-      <td>Top 314 Donors</td>
-      <td>CUELLAR, CLIFFORD</td>
-      <td>TACOMA</td>
-      <td>WA</td>
-      <td>984053360</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>20</td>
-      <td>Top 314 Donors</td>
-      <td>LAWRENCE, FRANK</td>
-      <td>LEES SUMMIT</td>
-      <td>MO</td>
-      <td>640863079</td>
-      <td>[2016, 2020]</td>
-    </tr>
-    <tr>
-      <td>21</td>
-      <td>Top 314 Donors</td>
-      <td>SWINDELL, DAVE</td>
-      <td>BOSTON</td>
-      <td>MA</td>
-      <td>021163510</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>22</td>
-      <td>Top 314 Donors</td>
-      <td>PROOPS, JAY</td>
-      <td>OVANDO</td>
-      <td>MT</td>
-      <td>598540149</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>23</td>
-      <td>Top 314 Donors</td>
-      <td>GURAL, JEFFREY</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>100175529</td>
-      <td>[2004, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>24</td>
-      <td>Top 314 Donors</td>
-      <td>SHOCH, JOHN PHD</td>
-      <td>WOODSIDE</td>
-      <td>CA</td>
-      <td>940622538</td>
-      <td>[2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>25</td>
-      <td>Top 314 Donors</td>
-      <td>HONARKAR, MOHAMMAD</td>
-      <td>IRVINE</td>
-      <td>CA</td>
-      <td>926184236</td>
-      <td>[2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>26</td>
-      <td>Top 314 Donors</td>
-      <td>BYERS, BROOK</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257020</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>27</td>
-      <td>Top 314 Donors</td>
-      <td>HUDSON, BRUCE S.</td>
-      <td>SYRACUSE</td>
-      <td>NY</td>
-      <td>132103116</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>28</td>
-      <td>Top 314 Donors</td>
-      <td>JHONG, EUGENE</td>
-      <td>LOS ALTOS</td>
-      <td>CA</td>
-      <td>940221702</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>29</td>
-      <td>Top 314 Donors</td>
-      <td>KARPLUS, BARBARA</td>
-      <td>NEWBURY PARK</td>
-      <td>CA</td>
-      <td>913202803</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>30</td>
-      <td>Top 314 Donors</td>
-      <td>GOLLON, PETER</td>
-      <td>HUNTINGTON</td>
-      <td>NY</td>
-      <td>117431918</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>31</td>
-      <td>Top 314 Donors</td>
-      <td>NORTON, JACK</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>10027</td>
-      <td>[2010, 2012, 2014, 2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>32</td>
-      <td>Top 314 Donors</td>
-      <td>GILBERT, JOHN</td>
-      <td>BROOKLINE</td>
-      <td>MA</td>
-      <td>024465769</td>
-      <td>[2004, 2006, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>33</td>
-      <td>Top 314 Donors</td>
-      <td>KAPER, TASSO</td>
-      <td>MANCHESTER</td>
-      <td>MA</td>
-      <td>019441048</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>34</td>
-      <td>Top 314 Donors</td>
-      <td>LEVINSON, FRANK</td>
-      <td>TIBURON</td>
-      <td>CA</td>
-      <td>949202523</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>35</td>
-      <td>Top 314 Donors</td>
-      <td>BEEUWKES, REINIER</td>
-      <td>CONCORD</td>
-      <td>MA</td>
-      <td>017425322</td>
-      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>36</td>
-      <td>Top 314 Donors</td>
-      <td>KIRK, CLAY</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>100215251</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>37</td>
-      <td>Top 314 Donors</td>
-      <td>JENCKS, CHRISTOPHER</td>
-      <td>CAMBRIDGE</td>
-      <td>MA</td>
-      <td>021382409</td>
-      <td>[2004, 2006, 2012, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>38</td>
-      <td>Top 314 Donors</td>
-      <td>FERSTER, DAVID</td>
-      <td>WILMETTE</td>
-      <td>IL</td>
-      <td>600911553</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>39</td>
-      <td>Top 314 Donors</td>
-      <td>NIELSEN, SHEILA</td>
-      <td>WINNETKA</td>
-      <td>IL</td>
-      <td>600932015</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>40</td>
-      <td>Top 314 Donors</td>
-      <td>HORLICK, SUSAN</td>
-      <td>TALLAHASSEE</td>
-      <td>FL</td>
-      <td>323117834</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>41</td>
-      <td>Top 314 Donors</td>
-      <td>TUSK, BRADLEY</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>100039605</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>42</td>
-      <td>Top 314 Donors</td>
-      <td>FORDE, JAMES</td>
-      <td>TUSTIN</td>
-      <td>CA</td>
-      <td>927806320</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>43</td>
-      <td>Top 314 Donors</td>
-      <td>BERG, FRED</td>
-      <td>CUSHING</td>
-      <td>ME</td>
-      <td>045633307</td>
-      <td>[2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>44</td>
-      <td>Top 314 Donors</td>
-      <td>MOUNT, PHYLLIS F.</td>
-      <td>SOUTHBURY</td>
-      <td>CT</td>
-      <td>064885719</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>45</td>
-      <td>Top 314 Donors</td>
-      <td>POWERS, ANN</td>
-      <td>DUNSMUIR</td>
-      <td>CA</td>
-      <td>960252504</td>
-      <td>[2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>46</td>
-      <td>Top 314 Donors</td>
-      <td>HALL, CLAIRE</td>
-      <td>VICTOR</td>
-      <td>NY</td>
-      <td>145641102</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>47</td>
-      <td>Top 314 Donors</td>
-      <td>BLUE, ALLEN</td>
-      <td>VENICE</td>
-      <td>CA</td>
-      <td>902913830</td>
-      <td>[2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>48</td>
-      <td>Top 314 Donors</td>
-      <td>FRIEDMAN, DONNA</td>
-      <td>MOUNT PLEASANT</td>
-      <td>SC</td>
-      <td>294644305</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>49</td>
-      <td>Top 314 Donors</td>
-      <td>FRIEDMAN, RANDOLPH</td>
-      <td>MOUNT PLEASANT</td>
-      <td>SC</td>
-      <td>294644305</td>
-      <td>[2018, 2020]</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Create-ctx_donor">Create <code>ctx_donor</code><a class="anchor-link" href="#Create-ctx_donor">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Since there is no chance of multiple inclusion of Donors in <code>ctx_dseg_memb</code> (i.e. <code>ctx_dseg</code> does not include more than one Donor Segments), then we can use the simpler SQL for creating <code>ctx_donor</code> (see similar section in <code>dc6</code> for a little discussion on this).</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[15]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_donor as
-select d.*
-  from ctx_dseg_memb dsmx
-  join donor_indiv d on d.id = dsmx.donor_indiv_id
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[15]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Quick validation&mdash;the rows here should match those queried just before creation of the Donor Segment (above), except full Donor names are now shown.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[16]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select id,
-       name,
-       city,
-       state,
-       zip_code,
-       elect_cycles
-  from ctx_donor
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-50 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[16]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>id</th>
-      <th>name</th>
-      <th>city</th>
-      <th>state</th>
-      <th>zip_code</th>
-      <th>elect_cycles</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>11659801</td>
-      <td>STOREY, BAYARD T PH.D.</td>
-      <td>PHILADELPHIA</td>
-      <td>PA</td>
-      <td>191303202</td>
-      <td>[2006, 2014, 2016]</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>10325529</td>
-      <td>ROSZAK, MATTHEW</td>
-      <td>WINNETKA</td>
-      <td>IL</td>
-      <td>600933630</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>9683572</td>
-      <td>PROCKOP, DARWIN J. MD, PHD</td>
-      <td>PHILADELPHIA</td>
-      <td>PA</td>
-      <td>191063913</td>
-      <td>[2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>9188602</td>
-      <td>PARK, TODD</td>
-      <td>LOS ALTOS HILLS</td>
-      <td>CA</td>
-      <td>940223385</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>10979072</td>
-      <td>SHENKER, SCOTT</td>
-      <td>BERKELEY</td>
-      <td>CA</td>
-      <td>947072052</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>4336953</td>
-      <td>GIRARDI, THOMAS V.</td>
-      <td>LOS ANGELES</td>
-      <td>CA</td>
-      <td>900171904</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>8656333</td>
-      <td>NASH, RICHARD</td>
-      <td>MISSOULA</td>
-      <td>MT</td>
-      <td>598045862</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>7</td>
-      <td>28429</td>
-      <td>ABRAMSON, RONALD</td>
-      <td>WASHINGTON</td>
-      <td>DC</td>
-      <td>200063807</td>
-      <td>[2012, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>8</td>
-      <td>11902785</td>
-      <td>TAYLOR, DALE</td>
-      <td>CHICAGO</td>
-      <td>IL</td>
-      <td>606146085</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>9</td>
-      <td>6822374</td>
-      <td>LARSEN, CHRIS</td>
-      <td>SAN FRANCISCO</td>
-      <td>CA</td>
-      <td>941091512</td>
-      <td>[2010, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>10</td>
-      <td>8417423</td>
-      <td>MORGAN, HOWARD L.</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>100657253</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>11</td>
-      <td>11356137</td>
-      <td>SOLIMAN, KARL</td>
-      <td>IRVINE</td>
-      <td>CA</td>
-      <td>926127186</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>12</td>
-      <td>7863787</td>
-      <td>MCEVOY, NION</td>
-      <td>SAN FRANCISCO</td>
-      <td>CA</td>
-      <td>94118</td>
-      <td>[2002, 2004, 2006, 2008, 2010, 2012, 2014, 201...</td>
-    </tr>
-    <tr>
-      <td>13</td>
-      <td>6110433</td>
-      <td>KAHN, RONALD N</td>
-      <td>SAN FRANCISCO</td>
-      <td>CA</td>
-      <td>941590599</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>14</td>
-      <td>9165471</td>
-      <td>PARK, DAVID</td>
-      <td>LOS ALTOS</td>
-      <td>CA</td>
-      <td>940223838</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>15</td>
-      <td>12143213</td>
-      <td>TORRES, TOMAS</td>
-      <td>HOUSTON</td>
-      <td>TX</td>
-      <td>770653124</td>
-      <td>[2012, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>16</td>
-      <td>8688914</td>
-      <td>NEGROPONTE, NICHOLAS</td>
-      <td>CAMBRIDGE</td>
-      <td>MA</td>
-      <td>021421322</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>17</td>
-      <td>678448</td>
-      <td>BASSI, STEVE</td>
-      <td>CARLSBAD</td>
-      <td>CA</td>
-      <td>920081900</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>18</td>
-      <td>4684620</td>
-      <td>GROSSBLATT, DAVID</td>
-      <td>SAN FRANCISCO</td>
-      <td>CA</td>
-      <td>941074317</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>19</td>
-      <td>2576925</td>
-      <td>CUELLAR, CLIFFORD</td>
-      <td>TACOMA</td>
-      <td>WA</td>
-      <td>984053360</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>20</td>
-      <td>6872845</td>
-      <td>LAWRENCE, FRANK</td>
-      <td>LEES SUMMIT</td>
-      <td>MO</td>
-      <td>640863079</td>
-      <td>[2016, 2020]</td>
-    </tr>
-    <tr>
-      <td>21</td>
-      <td>11823232</td>
-      <td>SWINDELL, DAVE</td>
-      <td>BOSTON</td>
-      <td>MA</td>
-      <td>021163510</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>22</td>
-      <td>9688035</td>
-      <td>PROOPS, JAY</td>
-      <td>OVANDO</td>
-      <td>MT</td>
-      <td>598540149</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>23</td>
-      <td>4745356</td>
-      <td>GURAL, JEFFREY</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>100175529</td>
-      <td>[2004, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>24</td>
-      <td>11024692</td>
-      <td>SHOCH, JOHN PHD</td>
-      <td>WOODSIDE</td>
-      <td>CA</td>
-      <td>940622538</td>
-      <td>[2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>25</td>
-      <td>5486301</td>
-      <td>HONARKAR, MOHAMMAD</td>
-      <td>IRVINE</td>
-      <td>CA</td>
-      <td>926184236</td>
-      <td>[2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>26</td>
-      <td>1661575</td>
-      <td>BYERS, BROOK</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257020</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>27</td>
-      <td>5601495</td>
-      <td>HUDSON, BRUCE S.</td>
-      <td>SYRACUSE</td>
-      <td>NY</td>
-      <td>132103116</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>28</td>
-      <td>5902719</td>
-      <td>JHONG, EUGENE</td>
-      <td>LOS ALTOS</td>
-      <td>CA</td>
-      <td>940221702</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>29</td>
-      <td>6169689</td>
-      <td>KARPLUS, BARBARA</td>
-      <td>NEWBURY PARK</td>
-      <td>CA</td>
-      <td>913202803</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>30</td>
-      <td>4435025</td>
-      <td>GOLLON, PETER</td>
-      <td>HUNTINGTON</td>
-      <td>NY</td>
-      <td>117431918</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>31</td>
-      <td>8848719</td>
-      <td>NORTON, JACK</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>10027</td>
-      <td>[2010, 2012, 2014, 2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>32</td>
-      <td>4293837</td>
-      <td>GILBERT, JOHN</td>
-      <td>BROOKLINE</td>
-      <td>MA</td>
-      <td>024465769</td>
-      <td>[2004, 2006, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>33</td>
-      <td>6147085</td>
-      <td>KAPER, TASSO</td>
-      <td>MANCHESTER</td>
-      <td>MA</td>
-      <td>019441048</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>34</td>
-      <td>7037936</td>
-      <td>LEVINSON, FRANK</td>
-      <td>TIBURON</td>
-      <td>CA</td>
-      <td>949202523</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>35</td>
-      <td>779629</td>
-      <td>BEEUWKES, REINIER</td>
-      <td>CONCORD</td>
-      <td>MA</td>
-      <td>017425322</td>
-      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>36</td>
-      <td>6433238</td>
-      <td>KIRK, CLAY</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>100215251</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>37</td>
-      <td>5870457</td>
-      <td>JENCKS, CHRISTOPHER</td>
-      <td>CAMBRIDGE</td>
-      <td>MA</td>
-      <td>021382409</td>
-      <td>[2004, 2006, 2012, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>38</td>
-      <td>3678807</td>
-      <td>FERSTER, DAVID</td>
-      <td>WILMETTE</td>
-      <td>IL</td>
-      <td>600911553</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>39</td>
-      <td>8793106</td>
-      <td>NIELSEN, SHEILA</td>
-      <td>WINNETKA</td>
-      <td>IL</td>
-      <td>600932015</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>40</td>
-      <td>5515167</td>
-      <td>HORLICK, SUSAN</td>
-      <td>TALLAHASSEE</td>
-      <td>FL</td>
-      <td>323117834</td>
-      <td>[2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>41</td>
-      <td>12265351</td>
-      <td>TUSK, BRADLEY</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>100039605</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>42</td>
-      <td>3850042</td>
-      <td>FORDE, JAMES</td>
-      <td>TUSTIN</td>
-      <td>CA</td>
-      <td>927806320</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>43</td>
-      <td>877907</td>
-      <td>BERG, FRED</td>
-      <td>CUSHING</td>
-      <td>ME</td>
-      <td>045633307</td>
-      <td>[2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>44</td>
-      <td>8496236</td>
-      <td>MOUNT, PHYLLIS F.</td>
-      <td>SOUTHBURY</td>
-      <td>CT</td>
-      <td>064885719</td>
-      <td>[2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>45</td>
-      <td>9625220</td>
-      <td>POWERS, ANN</td>
-      <td>DUNSMUIR</td>
-      <td>CA</td>
-      <td>960252504</td>
-      <td>[2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>46</td>
-      <td>4828088</td>
-      <td>HALL, CLAIRE</td>
-      <td>VICTOR</td>
-      <td>NY</td>
-      <td>145641102</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>47</td>
-      <td>1083690</td>
-      <td>BLUE, ALLEN</td>
-      <td>VENICE</td>
-      <td>CA</td>
-      <td>902913830</td>
-      <td>[2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>48</td>
-      <td>3993057</td>
-      <td>FRIEDMAN, DONNA</td>
-      <td>MOUNT PLEASANT</td>
-      <td>SC</td>
-      <td>294644305</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>49</td>
-      <td>3997846</td>
-      <td>FRIEDMAN, RANDOLPH</td>
-      <td>MOUNT PLEASANT</td>
-      <td>SC</td>
-      <td>294644305</td>
-      <td>[2018, 2020]</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Create-ctx_indiv">Create <code>ctx_indiv</code><a class="anchor-link" href="#Create-ctx_indiv">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[17]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_indiv as
-select i.*
-  from ctx_donor dx
-  join indiv i on i.donor_indiv_id = dx.id
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[17]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Note, there will likely be more Individuals in the context (compared to Donors above) due to the coalesce logic in <code>indiv_group</code>.  Individual records that are combined to form a Donor should be adjacent to each other here.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[18]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select id,
-       name,
-       city,
-       state,
-       zip_code,
-       elect_cycles,
-       donor_indiv_id
-  from ctx_indiv
- order by donor_indiv_id, name
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-54 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[18]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>id</th>
-      <th>name</th>
-      <th>city</th>
-      <th>state</th>
-      <th>zip_code</th>
-      <th>elect_cycles</th>
-      <th>donor_indiv_id</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>28429</td>
-      <td>ABRAMSON, RONALD</td>
-      <td>WASHINGTON</td>
-      <td>DC</td>
-      <td>200063807</td>
-      <td>[2012, 2014, 2016, 2018, 2020]</td>
-      <td>28429</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>678448</td>
-      <td>BASSI, STEVE</td>
-      <td>CARLSBAD</td>
-      <td>CA</td>
-      <td>920081900</td>
-      <td>[2018]</td>
-      <td>678448</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>779629</td>
-      <td>BEEUWKES, REINIER</td>
-      <td>CONCORD</td>
-      <td>MA</td>
-      <td>017425322</td>
-      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
-      <td>779629</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>877907</td>
-      <td>BERG, FRED</td>
-      <td>CUSHING</td>
-      <td>ME</td>
-      <td>045633307</td>
-      <td>[2016, 2018]</td>
-      <td>877907</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>1083690</td>
-      <td>BLUE, ALLEN</td>
-      <td>VENICE</td>
-      <td>CA</td>
-      <td>902913830</td>
-      <td>[2016, 2018]</td>
-      <td>1083690</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>1661575</td>
-      <td>BYERS, BROOK</td>
-      <td>MENLO PARK</td>
-      <td>CA</td>
-      <td>940257020</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-      <td>1661575</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>2576925</td>
-      <td>CUELLAR, CLIFFORD</td>
-      <td>TACOMA</td>
-      <td>WA</td>
-      <td>984053360</td>
-      <td>[2016, 2018, 2020]</td>
-      <td>2576925</td>
-    </tr>
-    <tr>
-      <td>7</td>
-      <td>3678807</td>
-      <td>FERSTER, DAVID</td>
-      <td>WILMETTE</td>
-      <td>IL</td>
-      <td>600911553</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-      <td>3678807</td>
-    </tr>
-    <tr>
-      <td>8</td>
-      <td>3850042</td>
-      <td>FORDE, JAMES</td>
-      <td>TUSTIN</td>
-      <td>CA</td>
-      <td>927806320</td>
-      <td>[2018]</td>
-      <td>3850042</td>
-    </tr>
-    <tr>
-      <td>9</td>
-      <td>3993057</td>
-      <td>FRIEDMAN, DONNA</td>
-      <td>MOUNT PLEASANT</td>
-      <td>SC</td>
-      <td>294644305</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-      <td>3993057</td>
-    </tr>
-    <tr>
-      <td>10</td>
-      <td>3997846</td>
-      <td>FRIEDMAN, RANDOLPH</td>
-      <td>MOUNT PLEASANT</td>
-      <td>SC</td>
-      <td>294644305</td>
-      <td>[2018, 2020]</td>
-      <td>3997846</td>
-    </tr>
-    <tr>
-      <td>11</td>
-      <td>4293837</td>
-      <td>GILBERT, JOHN</td>
-      <td>BROOKLINE</td>
-      <td>MA</td>
-      <td>024465769</td>
-      <td>[2004, 2006, 2014, 2016, 2018, 2020]</td>
-      <td>4293837</td>
-    </tr>
-    <tr>
-      <td>12</td>
-      <td>4336953</td>
-      <td>GIRARDI, THOMAS V.</td>
-      <td>LOS ANGELES</td>
-      <td>CA</td>
-      <td>900171904</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-      <td>4336953</td>
-    </tr>
-    <tr>
-      <td>13</td>
-      <td>4435025</td>
-      <td>GOLLON, PETER</td>
-      <td>HUNTINGTON</td>
-      <td>NY</td>
-      <td>117431918</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-      <td>4435025</td>
-    </tr>
-    <tr>
-      <td>14</td>
-      <td>4684620</td>
-      <td>GROSSBLATT, DAVID</td>
-      <td>SAN FRANCISCO</td>
-      <td>CA</td>
-      <td>941074317</td>
-      <td>[2018]</td>
-      <td>4684620</td>
-    </tr>
-    <tr>
-      <td>15</td>
-      <td>4745356</td>
-      <td>GURAL, JEFFREY</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>100175529</td>
-      <td>[2004, 2014, 2016, 2018, 2020]</td>
-      <td>4745356</td>
-    </tr>
-    <tr>
-      <td>16</td>
-      <td>4828088</td>
-      <td>HALL, CLAIRE</td>
-      <td>VICTOR</td>
-      <td>NY</td>
-      <td>145641102</td>
-      <td>[2018]</td>
-      <td>4828088</td>
-    </tr>
-    <tr>
-      <td>17</td>
-      <td>5486301</td>
-      <td>HONARKAR, MOHAMMAD</td>
-      <td>IRVINE</td>
-      <td>CA</td>
-      <td>926184236</td>
-      <td>[2016, 2018]</td>
-      <td>5486301</td>
-    </tr>
-    <tr>
-      <td>18</td>
-      <td>5515167</td>
-      <td>HORLICK, SUSAN</td>
-      <td>TALLAHASSEE</td>
-      <td>FL</td>
-      <td>323117834</td>
-      <td>[2016, 2018, 2020]</td>
-      <td>5515167</td>
-    </tr>
-    <tr>
-      <td>19</td>
-      <td>5601495</td>
-      <td>HUDSON, BRUCE S.</td>
-      <td>SYRACUSE</td>
-      <td>NY</td>
-      <td>132103116</td>
-      <td>[2016]</td>
-      <td>5601495</td>
-    </tr>
-    <tr>
-      <td>20</td>
-      <td>5870457</td>
-      <td>JENCKS, CHRISTOPHER</td>
-      <td>CAMBRIDGE</td>
-      <td>MA</td>
-      <td>021382409</td>
-      <td>[2004, 2006, 2012, 2014, 2016, 2018, 2020]</td>
-      <td>5870457</td>
-    </tr>
-    <tr>
-      <td>21</td>
-      <td>5902719</td>
-      <td>JHONG, EUGENE</td>
-      <td>LOS ALTOS</td>
-      <td>CA</td>
-      <td>940221702</td>
-      <td>[2018, 2020]</td>
-      <td>5902719</td>
-    </tr>
-    <tr>
-      <td>22</td>
-      <td>6110433</td>
-      <td>KAHN, RONALD N</td>
-      <td>SAN FRANCISCO</td>
-      <td>CA</td>
-      <td>941590599</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-      <td>6110433</td>
-    </tr>
-    <tr>
-      <td>23</td>
-      <td>6110440</td>
-      <td>KAHN, RONALD N.</td>
-      <td>SAN FRANCISCO</td>
-      <td>CA</td>
-      <td>941590599</td>
-      <td>[2016, 2018, 2020]</td>
-      <td>6110433</td>
-    </tr>
-    <tr>
-      <td>24</td>
-      <td>6147085</td>
-      <td>KAPER, TASSO</td>
-      <td>MANCHESTER</td>
-      <td>MA</td>
-      <td>019441048</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-      <td>6147085</td>
-    </tr>
-    <tr>
-      <td>25</td>
-      <td>6169689</td>
-      <td>KARPLUS, BARBARA</td>
-      <td>NEWBURY PARK</td>
-      <td>CA</td>
-      <td>913202803</td>
-      <td>[2016, 2018, 2020]</td>
-      <td>6169689</td>
-    </tr>
-    <tr>
-      <td>26</td>
-      <td>6433238</td>
-      <td>KIRK, CLAY</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>100215251</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-      <td>6433238</td>
-    </tr>
-    <tr>
-      <td>27</td>
-      <td>6433258</td>
-      <td>KIRK, CLAY KENAN</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>100215251</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-      <td>6433238</td>
-    </tr>
-    <tr>
-      <td>28</td>
-      <td>6822374</td>
-      <td>LARSEN, CHRIS</td>
-      <td>SAN FRANCISCO</td>
-      <td>CA</td>
-      <td>941091512</td>
-      <td>[2010, 2016, 2018, 2020]</td>
-      <td>6822374</td>
-    </tr>
-    <tr>
-      <td>29</td>
-      <td>6872845</td>
-      <td>LAWRENCE, FRANK</td>
-      <td>LEES SUMMIT</td>
-      <td>MO</td>
-      <td>640863079</td>
-      <td>[2016, 2020]</td>
-      <td>6872845</td>
-    </tr>
-    <tr>
-      <td>30</td>
-      <td>7037936</td>
-      <td>LEVINSON, FRANK</td>
-      <td>TIBURON</td>
-      <td>CA</td>
-      <td>949202523</td>
-      <td>[2016, 2018, 2020]</td>
-      <td>7037936</td>
-    </tr>
-    <tr>
-      <td>31</td>
-      <td>7863787</td>
-      <td>MCEVOY, NION</td>
-      <td>SAN FRANCISCO</td>
-      <td>CA</td>
-      <td>94118</td>
-      <td>[2002, 2004, 2006, 2008, 2010, 2012, 2014, 201...</td>
-      <td>7863787</td>
-    </tr>
-    <tr>
-      <td>32</td>
-      <td>8417423</td>
-      <td>MORGAN, HOWARD L.</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>100657253</td>
-      <td>[2018]</td>
-      <td>8417423</td>
-    </tr>
-    <tr>
-      <td>33</td>
-      <td>8496236</td>
-      <td>MOUNT, PHYLLIS F.</td>
-      <td>SOUTHBURY</td>
-      <td>CT</td>
-      <td>064885719</td>
-      <td>[2018, 2020]</td>
-      <td>8496236</td>
-    </tr>
-    <tr>
-      <td>34</td>
-      <td>8656333</td>
-      <td>NASH, RICHARD</td>
-      <td>MISSOULA</td>
-      <td>MT</td>
-      <td>598045862</td>
-      <td>[2018]</td>
-      <td>8656333</td>
-    </tr>
-    <tr>
-      <td>35</td>
-      <td>8688914</td>
-      <td>NEGROPONTE, NICHOLAS</td>
-      <td>CAMBRIDGE</td>
-      <td>MA</td>
-      <td>021421322</td>
-      <td>[2018]</td>
-      <td>8688914</td>
-    </tr>
-    <tr>
-      <td>36</td>
-      <td>8793106</td>
-      <td>NIELSEN, SHEILA</td>
-      <td>WINNETKA</td>
-      <td>IL</td>
-      <td>600932015</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-      <td>8793106</td>
-    </tr>
-    <tr>
-      <td>37</td>
-      <td>8848719</td>
-      <td>NORTON, JACK</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>10027</td>
-      <td>[2010, 2012, 2014, 2016, 2018]</td>
-      <td>8848719</td>
-    </tr>
-    <tr>
-      <td>38</td>
-      <td>8848720</td>
-      <td>NORTON, JACK</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>100276814</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-      <td>8848719</td>
-    </tr>
-    <tr>
-      <td>39</td>
-      <td>8848731</td>
-      <td>NORTON, JACK R.</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>10027</td>
-      <td>[2012, 2018]</td>
-      <td>8848719</td>
-    </tr>
-    <tr>
-      <td>40</td>
-      <td>9165471</td>
-      <td>PARK, DAVID</td>
-      <td>LOS ALTOS</td>
-      <td>CA</td>
-      <td>940223838</td>
-      <td>[2018]</td>
-      <td>9165471</td>
-    </tr>
-    <tr>
-      <td>41</td>
-      <td>9188602</td>
-      <td>PARK, TODD</td>
-      <td>LOS ALTOS HILLS</td>
-      <td>CA</td>
-      <td>940223385</td>
-      <td>[2018, 2020]</td>
-      <td>9188602</td>
-    </tr>
-    <tr>
-      <td>42</td>
-      <td>9625220</td>
-      <td>POWERS, ANN</td>
-      <td>DUNSMUIR</td>
-      <td>CA</td>
-      <td>960252504</td>
-      <td>[2016, 2018]</td>
-      <td>9625220</td>
-    </tr>
-    <tr>
-      <td>43</td>
-      <td>9683572</td>
-      <td>PROCKOP, DARWIN J. MD, PHD</td>
-      <td>PHILADELPHIA</td>
-      <td>PA</td>
-      <td>191063913</td>
-      <td>[2016, 2018]</td>
-      <td>9683572</td>
-    </tr>
-    <tr>
-      <td>44</td>
-      <td>9688035</td>
-      <td>PROOPS, JAY</td>
-      <td>OVANDO</td>
-      <td>MT</td>
-      <td>598540149</td>
-      <td>[2018]</td>
-      <td>9688035</td>
-    </tr>
-    <tr>
-      <td>45</td>
-      <td>10325529</td>
-      <td>ROSZAK, MATTHEW</td>
-      <td>WINNETKA</td>
-      <td>IL</td>
-      <td>600933630</td>
-      <td>[2018, 2020]</td>
-      <td>10325529</td>
-    </tr>
-    <tr>
-      <td>46</td>
-      <td>10979072</td>
-      <td>SHENKER, SCOTT</td>
-      <td>BERKELEY</td>
-      <td>CA</td>
-      <td>947072052</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-      <td>10979072</td>
-    </tr>
-    <tr>
-      <td>47</td>
-      <td>11024692</td>
-      <td>SHOCH, JOHN PHD</td>
-      <td>WOODSIDE</td>
-      <td>CA</td>
-      <td>940622538</td>
-      <td>[2016, 2018]</td>
-      <td>11024692</td>
-    </tr>
-    <tr>
-      <td>48</td>
-      <td>11356137</td>
-      <td>SOLIMAN, KARL</td>
-      <td>IRVINE</td>
-      <td>CA</td>
-      <td>926127186</td>
-      <td>[2018]</td>
-      <td>11356137</td>
-    </tr>
-    <tr>
-      <td>49</td>
-      <td>11659801</td>
-      <td>STOREY, BAYARD T PH.D.</td>
-      <td>PHILADELPHIA</td>
-      <td>PA</td>
-      <td>191303202</td>
-      <td>[2006, 2014, 2016]</td>
-      <td>11659801</td>
-    </tr>
-    <tr>
-      <td>50</td>
-      <td>11823232</td>
-      <td>SWINDELL, DAVE</td>
-      <td>BOSTON</td>
-      <td>MA</td>
-      <td>021163510</td>
-      <td>[2018]</td>
-      <td>11823232</td>
-    </tr>
-    <tr>
-      <td>51</td>
-      <td>11902785</td>
-      <td>TAYLOR, DALE</td>
-      <td>CHICAGO</td>
-      <td>IL</td>
-      <td>606146085</td>
-      <td>[2016, 2018, 2020]</td>
-      <td>11902785</td>
-    </tr>
-    <tr>
-      <td>52</td>
-      <td>12143213</td>
-      <td>TORRES, TOMAS</td>
-      <td>HOUSTON</td>
-      <td>TX</td>
-      <td>770653124</td>
-      <td>[2012, 2014, 2016, 2018, 2020]</td>
-      <td>12143213</td>
-    </tr>
-    <tr>
-      <td>53</td>
-      <td>12265351</td>
-      <td>TUSK, BRADLEY</td>
-      <td>NEW YORK</td>
-      <td>NY</td>
-      <td>100039605</td>
-      <td>[2014, 2016, 2018, 2020]</td>
-      <td>12265351</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Create-ctx_contrib">Create <code>ctx_contrib</code><a class="anchor-link" href="#Create-ctx_contrib">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[19]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-create or replace view ctx_contrib as
-select ic.*,
-       ix.donor_indiv_id
-  from ctx_indiv ix
-  join indiv_contrib ic on ic.indiv_id = ix.id
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-Done.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[19]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[20]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select count(*)             as contribs,
-       sum(transaction_amt) as total_amt,
-       array_agg(distinct elect_cycle) as elect_cycles
-  from ctx_contrib
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@localhost/fecdb
-1 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[20]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>contribs</th>
-      <th>total_amt</th>
-      <th>elect_cycles</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>4369</td>
-      <td>6663529.00</td>
-      <td>[2002, 2004, 2006, 2008, 2010, 2012, 2014, 201...</td>
-    </tr>
-  </tbody>
-</table>
-</div>
+<div class="output_png output_subarea ">
+<img src="data:image/png;base64,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
+"
+>
 </div>
 
 </div>
