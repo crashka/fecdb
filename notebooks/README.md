@@ -73,3 +73,7 @@ various contexts that may be set:
 * It would also be nice to be able to define several different named contexts (with other
   identifying metadata, as discussed for above) and be able to swtich between them when
   querying&mdash;or possibly even plot them against each other.
+
+    * As above, separate contexts can be implemented as sets of views within disparate
+      schemas for a user (additional support would be needed to query or plot from views
+      across schemas).
