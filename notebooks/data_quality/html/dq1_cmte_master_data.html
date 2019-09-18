@@ -13078,7 +13078,23 @@ div#notebook {
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
 <h1>Committee Master &ndash; Data Quality</h1>
-<h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Committees in the FEC data set have a unique ID assigned to them.  However, since we are combining Committee records from multiple election cycle source files, we really should join to <code>cmte</code> using both <code>cmte_id</code> and <code>elect_cycle</code>.  The purpose of this notebook is to explore to "quality" of the Committee data both within and across election cycles to see how consistent it is, and whether (and how) we can create a unified Committee Master entity to improve referential integrity for the larger, complete data set.</p>
+<h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Committees in the FEC data set have a unique ID assigned to them.  However, since we are combining Committee records from multiple election cycle source files, we really should join to <code>cmte</code> using both <code>cmte_id</code> and <code>elect_cycle</code>.  The purpose of this notebook is to explore the "quality" of the Committee data, both within and across election cycles, to see how consistent it is, and how we can create a unified Committee Master entity to improve referential integrity for the larger, complete data set.</p>
+<p>Here is a list of the examinations in this notebook:</p>
+<ul>
+<li>Quality of Committee Names (<code>cmte_nm</code>)</li>
+<li>Integrity of Committee ID (<code>cmte_id</code>)</li>
+<li>Consistency of names for <code>cmte_id</code>'s across election cycles</li>
+<li>Multiple <code>cmte_id</code>'s for identical names &ndash; within election cycles</li>
+<li>Multiple <code>cmte_id</code>'s for identical names &ndash; across election cycles</li>
+<li>Integrity of Candidate ID (<code>cand_id</code>)</li>
+<li>Consistency of Committee-Candidate associations (join through <code>cand_id</code>)</li>
+</ul>
+<p>Here are additional examinations to do:</p>
+<ul>
+<li>Multiple <code>cmte_id</code>'s for <em>similar</em> names &ndash; within election cycles</li>
+<li>Multiple <code>cmte_id</code>'s for <em>similar</em> names &ndash; across election cycles</li>
+<li>Consistency of Committee-Candidate associations (join through <code>cand_cmte</code> intersect table)</li>
+</ul>
 
 </div>
 </div>
@@ -13208,7 +13224,7 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Examine-Constitution-of-Committee-Data">Examine Constitution of Committee Data<a class="anchor-link" href="#Examine-Constitution-of-Committee-Data">&#182;</a></h2>
+<h2 id="Examination-of-Committee-Data-Set">Examination of Committee Data Set<a class="anchor-link" href="#Examination-of-Committee-Data-Set">&#182;</a></h2>
 </div>
 </div>
 </div>
@@ -14295,7 +14311,7 @@ select cmte_nm,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Integrity-of-Committee-ID-(cmte_id)">Integrity of Committee ID (<code>cmte_id</code>)<a class="anchor-link" href="#Integrity-of-Committee-ID-(cmte_id)">&#182;</a></h3><p>Count records across election cycles and see if we have any null <code>cmte_id</code>'s (all zeros would be good)</p>
+<p>And inconsistent spacing around commas (either space before, or no space after)</p>
 
 </div>
 </div>
@@ -14303,6 +14319,330 @@ select cmte_nm,
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">In&nbsp;[12]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select elect_cycle,
+       count(*)
+  from cmte
+ where cmte_nm ~ &#39; ,|,[^ ]&#39;
+ group by 1
+ order by 1
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+11 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[12]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>elect_cycle</th>
+      <th>count</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>2000</td>
+      <td>3</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>2002</td>
+      <td>3</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>2004</td>
+      <td>6</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>2006</td>
+      <td>2</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>2008</td>
+      <td>2</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>2010</td>
+      <td>5</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>2012</td>
+      <td>4</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>2014</td>
+      <td>6</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>2016</td>
+      <td>6</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>2018</td>
+      <td>8</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>2020</td>
+      <td>8</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[13]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select cmte_nm,
+       array_agg(distinct elect_cycle)
+  from cmte
+ where cmte_nm ~ &#39; ,|,[^ ]&#39;
+ group by 1
+ order by 1
+ limit 50
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+22 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[13]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>cmte_nm</th>
+      <th>array_agg</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>10,000 LAKES VICTORY 2014</td>
+      <td>[2014]</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>BAKER, MANOCK &amp; JENSEN , A PROFESSIONAL CORPOR...</td>
+      <td>[2010]</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>BSA , THE SOFTWARE ALLIANCE PAC</td>
+      <td>[2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>CHAD LEE FOR CONGRESS,INC.</td>
+      <td>[2012, 2014]</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>CITIZENS FOR MIKE ASSAD,INC</td>
+      <td>[2014, 2016]</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>CLOROX COMPANY EMPLOYEES' POLITICAL ACTION COM...</td>
+      <td>[2000, 2002, 2004, 2006, 2008]</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>CONTI FOR CONGRESS,INC.</td>
+      <td>[2004]</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>DAVID WOOD , MAKE AMERICA RIGHTEOUS AGAIN</td>
+      <td>[2020]</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>DEMOCRACYONE,INC.</td>
+      <td>[2020]</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>DISTRICT 1199J,NUHHCE,AFSCME,AFL-CIO</td>
+      <td>[2010, 2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>FRIENDS FOR DARREN YANCY,INC</td>
+      <td>[2010]</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>I PEGGED DONALT TRUMP'S UGLY OLD BITCH ASS WIT...</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>KAYDALY,COM</td>
+      <td>[2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>13</td>
+      <td>LEININGER,O O</td>
+      <td>[2012, 2014, 2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>14</td>
+      <td>LIBERTY COMMITTEE,THE</td>
+      <td>[2000, 2002, 2004, 2006, 2008, 2010]</td>
+    </tr>
+    <tr>
+      <td>15</td>
+      <td>LOS ANGELES CONSTITUTIONAL COALITION OF BILL C...</td>
+      <td>[2010, 2012]</td>
+    </tr>
+    <tr>
+      <td>16</td>
+      <td>MEYER, SUOZZI, ENGLISH &amp; KLEIN,PC-FEDERAL PAC(...</td>
+      <td>[2000, 2002, 2004]</td>
+    </tr>
+    <tr>
+      <td>17</td>
+      <td>PRO LIFE DEMOCRATS, ANGELS EXIST,THAY NEVER AS...</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>18</td>
+      <td>SOROS,GEORGE</td>
+      <td>[2004]</td>
+    </tr>
+    <tr>
+      <td>19</td>
+      <td>STEVE SCHWARTZBERG FOR CONGRESS COMMITTEE,INCO...</td>
+      <td>[2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>20</td>
+      <td>VOICE FOR TREES POLITICAL ACTION COMMITTEE, "V...</td>
+      <td>[2004]</td>
+    </tr>
+    <tr>
+      <td>21</td>
+      <td>WE CAN DO IT , YOU GUYS ! PROBABLY.</td>
+      <td>[2016, 2018]</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Integrity-of-Committee-ID-(cmte_id)">Integrity of Committee ID (<code>cmte_id</code>)<a class="anchor-link" href="#Integrity-of-Committee-ID-(cmte_id)">&#182;</a></h3><p>Count records across election cycles and see if we have any null <code>cmte_id</code>'s (all zeros would be good)</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[14]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -14336,7 +14676,7 @@ select elect_cycle,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[12]:</div>
+    <div class="prompt output_prompt">Out[14]:</div>
 
 
 
@@ -14452,7 +14792,7 @@ select elect_cycle,
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[13]:</div>
+<div class="prompt input_prompt">In&nbsp;[15]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -14494,7 +14834,7 @@ select elect_cycle,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[13]:</div>
+    <div class="prompt output_prompt">Out[15]:</div>
 
 
 
@@ -14541,7 +14881,7 @@ select elect_cycle,
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[14]:</div>
+<div class="prompt input_prompt">In&nbsp;[16]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -14582,7 +14922,7 @@ select ec_count,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[14]:</div>
+    <div class="prompt output_prompt">Out[16]:</div>
 
 
 
@@ -14697,7 +15037,7 @@ select ec_count,
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[15]:</div>
+<div class="prompt input_prompt">In&nbsp;[17]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -14739,7 +15079,7 @@ select num_diff_names,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[15]:</div>
+    <div class="prompt output_prompt">Out[17]:</div>
 
 
 
@@ -14837,7 +15177,7 @@ select num_diff_names,
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[16]:</div>
+<div class="prompt input_prompt">In&nbsp;[18]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -14878,7 +15218,7 @@ select cmte_id,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[16]:</div>
+    <div class="prompt output_prompt">Out[18]:</div>
 
 
 
@@ -15177,7 +15517,7 @@ select cmte_id,
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[17]:</div>
+<div class="prompt input_prompt">In&nbsp;[19]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -15218,7 +15558,7 @@ select cmte_id,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[17]:</div>
+    <div class="prompt output_prompt">Out[19]:</div>
 
 
 
@@ -15522,7 +15862,7 @@ select cmte_id,
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[18]:</div>
+<div class="prompt input_prompt">In&nbsp;[20]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -15563,7 +15903,7 @@ select cmte_id,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[18]:</div>
+    <div class="prompt output_prompt">Out[20]:</div>
 
 
 
@@ -15872,7 +16212,7 @@ select cmte_id,
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[19]:</div>
+<div class="prompt input_prompt">In&nbsp;[21]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -15913,7 +16253,7 @@ select num_shares,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[19]:</div>
+    <div class="prompt output_prompt">Out[21]:</div>
 
 
 
@@ -15979,7 +16319,7 @@ select num_shares,
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[20]:</div>
+<div class="prompt input_prompt">In&nbsp;[22]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -16023,7 +16363,7 @@ select cmte_nm,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[20]:</div>
+    <div class="prompt output_prompt">Out[22]:</div>
 
 
 
@@ -16500,7 +16840,7 @@ select cmte_nm,
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[21]:</div>
+<div class="prompt input_prompt">In&nbsp;[23]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -16545,7 +16885,7 @@ select cmte_nm,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[21]:</div>
+    <div class="prompt output_prompt">Out[23]:</div>
 
 
 
@@ -16946,7 +17286,7 @@ select cmte_nm,
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[22]:</div>
+<div class="prompt input_prompt">In&nbsp;[24]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -16986,7 +17326,7 @@ select num_cmte_ids,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[22]:</div>
+    <div class="prompt output_prompt">Out[24]:</div>
 
 
 
@@ -17077,7 +17417,7 @@ select num_cmte_ids,
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[23]:</div>
+<div class="prompt input_prompt">In&nbsp;[25]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -17120,7 +17460,7 @@ select cmte_nm,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[23]:</div>
+    <div class="prompt output_prompt">Out[25]:</div>
 
 
 
@@ -17463,14 +17803,1397 @@ select cmte_nm,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="To-Do">To Do<a class="anchor-link" href="#To-Do">&#182;</a></h3><p>Examine the following:</p>
-<ul>
-<li>Multiple <code>cmte_id</code>'s for <em>similar</em> names &ndash; within election cycles</li>
-<li>Multiple <code>cmte_id</code>'s for <em>similar</em> names &ndash; across election cycles</li>
-</ul>
+<h3 id="Integrity-of-Candidate-ID-(cand_id)">Integrity of Candidate ID (<code>cand_id</code>)<a class="anchor-link" href="#Integrity-of-Candidate-ID-(cand_id)">&#182;</a></h3><p>Let's check the number (and percentage) of null <code>cand_id</code>'s, which presumably represent Committees with no Candidate association.</p>
 
 </div>
 </div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[26]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select count(*) as null_cand_ids,
+       round(count(*)::numeric / :cmte_count_total * 100.0, 2) as pct_null_cand_ids
+  from cmte
+ where cand_id is null
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+1 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[26]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>null_cand_ids</th>
+      <th>pct_null_cand_ids</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>86964</td>
+      <td>62.84</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Same thing, but only looking at distinct <code>cmte_id</code>'s (i.e. across election cycles)</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[27]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select count(distinct cmte_id) as distinct_null_cand_ids,
+       round(count(distinct cmte_id)::numeric / :cmte_distinct_ids * 100.0, 2) as pct_distinct_null_cand_ids
+  from cmte
+ where cand_id is null
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+1 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[27]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>distinct_null_cand_ids</th>
+      <th>pct_distinct_null_cand_ids</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>23865</td>
+      <td>52.03</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Now let's look for <code>cand_id</code>'s that don't join to Candidate records from the same election cycle (<code>cand</code> and <code>cmte</code> files should be published together by election cycle)</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[28]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select count(*)
+  from cmte
+ where (cand_id, elect_cycle) not in (select cand_id, elect_cycle from cand)
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+1 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[28]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>count</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>18</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Of those, let's see how many of the <code>cand_id</code>'s just point into outer space (i.e. don't exist in any election cycle Candidate data)</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[29]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select count(*)
+  from cmte
+ where (cand_id) not in (select cand_id from cand)
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+1 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[29]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>count</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>11</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Let's take a look at those, and see if there are perhaps other Committee records with the same <code>cmte_id</code> that
+<em>do</em> join to Candidate records</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[30]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select cmte.cmte_id,
+       cmte.cmte_nm,
+       count(*),
+       array_agg(distinct cmte.elect_cycle) as elect_cycles,
+       array_agg(distinct cmte.cand_id)     as bad_cand_ids,
+       array_agg(distinct cand2.cand_id)    as other_cand_ids
+  from cmte
+  left join cmte cmte2 on  cmte2.cmte_id     = cmte.cmte_id
+  left join cand cand2 on  cand2.cand_id     = cmte2.cand_id
+                       and cand2.elect_cycle = cmte2.elect_cycle
+ where (cmte.cand_id) not in (select cand_id from cand)
+ group by 1, 2
+ order by 1, 2
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+8 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[30]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>cmte_id</th>
+      <th>cmte_nm</th>
+      <th>count</th>
+      <th>elect_cycles</th>
+      <th>bad_cand_ids</th>
+      <th>other_cand_ids</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>C00356071</td>
+      <td>BILL HAAS FOR CONGRESS (1ST DISTRICT MISSOURI)</td>
+      <td>4</td>
+      <td>[2000, 2002]</td>
+      <td>[H0MO01082]</td>
+      <td>[None]</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>C00363937</td>
+      <td>MIKE GALLAGHER FOR CONGRESS</td>
+      <td>2</td>
+      <td>[2000]</td>
+      <td>[H0FL15047]</td>
+      <td>[None]</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>C00625046</td>
+      <td>COMMITTEE TO ELECT BENJAMIN NOFS</td>
+      <td>4</td>
+      <td>[2016, 2018]</td>
+      <td>[H6MD10024]</td>
+      <td>[None]</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>C00626838</td>
+      <td>SHELLY SCHRATZ FOR CONGRESS</td>
+      <td>1</td>
+      <td>[2016]</td>
+      <td>[H6NY26123]</td>
+      <td>[None]</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>C00650424</td>
+      <td>DWIGHT BRADY FOR CONGRESS</td>
+      <td>1</td>
+      <td>[2018]</td>
+      <td>[H8MI01156]</td>
+      <td>[None]</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>C00677690</td>
+      <td>WASHINGTON FOR CONGRESS COMMITTEE</td>
+      <td>4</td>
+      <td>[2018, 2020]</td>
+      <td>[H8PA13158]</td>
+      <td>[None]</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>C00712851</td>
+      <td>AMERICAN RELIGIOUS  PARTY</td>
+      <td>1</td>
+      <td>[2020]</td>
+      <td>[C00713602]</td>
+      <td>[None]</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>C00716191</td>
+      <td>LOGAN WILDE FOR CONGRESS</td>
+      <td>1</td>
+      <td>[2020]</td>
+      <td>[H0UT01122]</td>
+      <td>[None]</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Now we'll take a look at the <code>cmte-cand</code> joins that don't match within the election cycles they came with, but do join across disparate election cycles</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[31]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select count(*)
+  from cmte
+ where (cand_id, elect_cycle) not in (select cand_id, elect_cycle from cand)
+   and (cand_id) in (select cand_id from cand)
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+1 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[31]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>count</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>7</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[32]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select cmte.cmte_id,
+       cmte.cmte_nm,
+       cmte.elect_cycle as cmte_ec,
+       cmte.cand_id,
+       array_agg(distinct cand.cand_name) as cand_names,
+       array_agg(distinct cand.elect_cycle) as cand_elect_cycles
+  from cmte
+  join cand on cand.cand_id = cmte.cand_id
+ where (cmte.cand_id, cmte.elect_cycle) not in (select cand_id, elect_cycle from cand)
+ group by 1, 2, 3, 4
+ order by 1, 2, 3, 4
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+7 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[32]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>cmte_id</th>
+      <th>cmte_nm</th>
+      <th>cmte_ec</th>
+      <th>cand_id</th>
+      <th>cand_names</th>
+      <th>cand_elect_cycles</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>C00330043</td>
+      <td>ROSKAM FOR CONGRESS COMMITTEE</td>
+      <td>2000</td>
+      <td>H6IL06117</td>
+      <td>[ROSKAM, PETER]</td>
+      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>C00342261</td>
+      <td>PEOPLE FOR AMERICAN LEADERSHIP</td>
+      <td>2000</td>
+      <td>P00003392</td>
+      <td>[CLINTON, HILLARY RODHAM, CLINTON, HILLARY ROD...</td>
+      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>C00390468</td>
+      <td>DRAFT HILLARY FOR PRESIDENT 2004</td>
+      <td>2004</td>
+      <td>P00003392</td>
+      <td>[CLINTON, HILLARY RODHAM, CLINTON, HILLARY ROD...</td>
+      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>C00400473</td>
+      <td>HILLARY CLINTON FOR PRESIDENT 2008</td>
+      <td>2004</td>
+      <td>P00003392</td>
+      <td>[CLINTON, HILLARY RODHAM, CLINTON, HILLARY ROD...</td>
+      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>C00459768</td>
+      <td>JOSE RUIZ FOR CONGRESS COMMITTEE</td>
+      <td>2012</td>
+      <td>H0FL19049</td>
+      <td>[RUIZ, JOSE M]</td>
+      <td>[2010, 2014, 2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>C00636308</td>
+      <td>GABRIEL MCARTHUR FOR CONGRESS</td>
+      <td>2018</td>
+      <td>H8C006211</td>
+      <td>[MCARTHUR, GABRIEL SHAWN MR.]</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>C00636308</td>
+      <td>GABRIEL MCARTHUR FOR CONGRESS</td>
+      <td>2020</td>
+      <td>H8C006211</td>
+      <td>[MCARTHUR, GABRIEL SHAWN MR.]</td>
+      <td>[2016]</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Consistency-of-Committee-Candidate-associations-(join-through-cand_id)">Consistency of Committee-Candidate associations (join through <code>cand_id</code>)<a class="anchor-link" href="#Consistency-of-Committee-Candidate-associations-(join-through-cand_id)">&#182;</a></h3><p>We first check for <code>cmte_id</code>'s with different <code>cand_id</code>'s within any election cycle</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[33]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+with ec_cmte_cand_diffs as (
+    select elect_cycle,
+           cmte_id,
+           count(distinct cand_id) as distinct_cand_ids,
+           array_agg(distinct cand_id) as cand_ids
+      from cmte
+     group by 1, 2
+    having count(distinct cand_id) &gt; 1
+)
+select elect_cycle,
+       distinct_cand_ids,
+       count(*) as ec_cmte_ids
+  from ec_cmte_cand_diffs
+ group by 1, 2
+ order by 1, 2 desc
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+0 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[33]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>If not, now let's check for <code>cmte_id</code>'s with different <code>cand_id</code>'s <em>across</em> election cycles</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[34]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+with cmte_cand_diffs as (
+    select cmte_id,
+           count(distinct cand_id) as distinct_cand_ids,
+           array_agg(distinct cand_id) as cand_ids
+      from cmte
+     group by 1
+    having count(distinct cand_id) &gt; 1
+)
+select distinct_cand_ids,
+       count(*) as cmte_ids
+  from cmte_cand_diffs
+ group by 1
+ order by 1 desc
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+2 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[34]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>distinct_cand_ids</th>
+      <th>cmte_ids</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>3</td>
+      <td>3</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>2</td>
+      <td>228</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Let's captures some of the instances, so we can visually inspect the disparate Candidate information for a specific Committee (as identified by <code>cmte_id</code>)</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[35]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span> result &lt;&lt;
+with cmte_cand_diffs as (
+    select cmte_id,
+           count(distinct cand_id) as distinct_cand_ids,
+           array_agg(distinct cand_id) as cand_ids
+      from cmte
+     group by 1
+    having count(distinct cand_id) &gt; 1
+)
+select *
+  from cmte_cand_diffs
+ order by 2 desc
+ limit 50
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+50 rows affected.
+Returning data to local variable result
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>We'll take a look at the first ten instances...</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[36]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">cmte_id0</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">cmte_id1</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">cmte_id2</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">cmte_id3</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">cmte_id4</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">4</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">cmte_id5</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">5</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">cmte_id6</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">6</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">cmte_id7</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">7</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">cmte_id8</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">8</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">cmte_id9</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">9</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">9</span><span class="p">]</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[36]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>cmte_id</th>
+      <th>distinct_cand_ids</th>
+      <th>cand_ids</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>C00354597</td>
+      <td>3</td>
+      <td>[H0NJ10117, H2FL11075, P40003345]</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>C00501197</td>
+      <td>3</td>
+      <td>[H2TX16185, P00010793, S8TX00285]</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>C00567677</td>
+      <td>3</td>
+      <td>[H0NY19139, H2AZ08102, H4CA45097]</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>C00254938</td>
+      <td>2</td>
+      <td>[H2DE00072, S0DE00068, None]</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>C00266932</td>
+      <td>2</td>
+      <td>[H2GA08038, S2GA00118]</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>C00267708</td>
+      <td>2</td>
+      <td>[H2FL16041, S4FL00207]</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>C00264697</td>
+      <td>2</td>
+      <td>[H2OH13033, S6OH00163]</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>C00303552</td>
+      <td>2</td>
+      <td>[H2NJ06053, S6NJ00164]</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>C00304758</td>
+      <td>2</td>
+      <td>[H6MO07128, S0MO00183]</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>We sort by <code>cmte_id</code>, so the variation in Candidate ID and name will be in adjacent rows.  It is interesting to see whether <code>cand_id</code> just switches at a point in time (election cycle), or whether multiple values are used haphazardly between cycles</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[37]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+select cmte.cmte_id,
+       cand.cand_id,
+       cand.cand_name,
+       array_agg(distinct cand.elect_cycle) as elect_cycles
+  from cmte
+  join cand on  cand.cand_id     = cmte.cand_id
+            and cand.elect_cycle = cmte.elect_cycle
+ where cmte.cmte_id in (:cmte_id0, :cmte_id1, :cmte_id2, :cmte_id3, :cmte_id4,
+                        :cmte_id5, :cmte_id6, :cmte_id7, :cmte_id8, :cmte_id9)
+ group by 1, 2, 3
+ order by 1, 2, 3
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+28 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[37]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>cmte_id</th>
+      <th>cand_id</th>
+      <th>cand_name</th>
+      <th>elect_cycles</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>C00254938</td>
+      <td>H2DE00072</td>
+      <td>CASTLE, MICHAEL N</td>
+      <td>[2000, 2002, 2004, 2006, 2008]</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>C00254938</td>
+      <td>S0DE00068</td>
+      <td>CASTLE, MICHAEL N</td>
+      <td>[2010, 2012]</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>C00264697</td>
+      <td>H2OH13033</td>
+      <td>BROWN, SHERROD</td>
+      <td>[2000, 2002, 2004]</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>C00264697</td>
+      <td>S6OH00163</td>
+      <td>BROWN, SHERROD</td>
+      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>C00266932</td>
+      <td>H2GA08038</td>
+      <td>CHAMBLISS, SAXBY</td>
+      <td>[2000]</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>C00266932</td>
+      <td>S2GA00118</td>
+      <td>CHAMBLISS, C SAXBY</td>
+      <td>[2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>C00266932</td>
+      <td>S2GA00118</td>
+      <td>CHAMBLISS, SAXBY</td>
+      <td>[2002, 2004, 2006, 2008, 2010]</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>C00267708</td>
+      <td>H2FL16041</td>
+      <td>DEUTSCH, PETER R</td>
+      <td>[2000, 2002]</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>C00267708</td>
+      <td>S4FL00207</td>
+      <td>DEUTSCH, PETER</td>
+      <td>[2004, 2006, 2008]</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>C00303552</td>
+      <td>H2NJ06053</td>
+      <td>SMITH, ROBERT G</td>
+      <td>[2002, 2004]</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>C00303552</td>
+      <td>S6NJ00164</td>
+      <td>SMITH, ROBERT G</td>
+      <td>[2000]</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>C00304758</td>
+      <td>H6MO07128</td>
+      <td>BLUNT, ROY</td>
+      <td>[2000, 2002, 2004, 2006, 2008]</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>C00304758</td>
+      <td>S0MO00183</td>
+      <td>BLUNT, ROY</td>
+      <td>[2010, 2012, 2014, 2016, 2018, 2020]</td>
+    </tr>
+    <tr>
+      <td>13</td>
+      <td>C00307165</td>
+      <td>H6SD00085</td>
+      <td>THUNE, JOHN R</td>
+      <td>[2000]</td>
+    </tr>
+    <tr>
+      <td>14</td>
+      <td>C00307165</td>
+      <td>S2SD00068</td>
+      <td>THUNE, JOHN</td>
+      <td>[2002]</td>
+    </tr>
+    <tr>
+      <td>15</td>
+      <td>C00307165</td>
+      <td>S2SD00068</td>
+      <td>THUNE, JOHN R</td>
+      <td>[2004]</td>
+    </tr>
+    <tr>
+      <td>16</td>
+      <td>C00354597</td>
+      <td>H0NJ10117</td>
+      <td>FLASH, ROCKY</td>
+      <td>[2000]</td>
+    </tr>
+    <tr>
+      <td>17</td>
+      <td>C00354597</td>
+      <td>H2FL11075</td>
+      <td>FLASH, ROCKY</td>
+      <td>[2002]</td>
+    </tr>
+    <tr>
+      <td>18</td>
+      <td>C00354597</td>
+      <td>P40003345</td>
+      <td>FLASH, ROCKY HURRICANE</td>
+      <td>[2004, 2006]</td>
+    </tr>
+    <tr>
+      <td>19</td>
+      <td>C00501197</td>
+      <td>H2TX16185</td>
+      <td>O'ROURKE, ROBERT BETO</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>20</td>
+      <td>C00501197</td>
+      <td>H2TX16185</td>
+      <td>O'ROURKE, ROBERT ''BETO''</td>
+      <td>[2012]</td>
+    </tr>
+    <tr>
+      <td>21</td>
+      <td>C00501197</td>
+      <td>H2TX16185</td>
+      <td>O'ROURKE, ROBERT (BETO)</td>
+      <td>[2014]</td>
+    </tr>
+    <tr>
+      <td>22</td>
+      <td>C00501197</td>
+      <td>P00010793</td>
+      <td>O'ROURKE, ROBERT BETO</td>
+      <td>[2020]</td>
+    </tr>
+    <tr>
+      <td>23</td>
+      <td>C00501197</td>
+      <td>S8TX00285</td>
+      <td>O'ROURKE, ROBERT (BETO)</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>24</td>
+      <td>C00567677</td>
+      <td>H0NY19139</td>
+      <td>HAYWORTH, NAN</td>
+      <td>[2014]</td>
+    </tr>
+    <tr>
+      <td>25</td>
+      <td>C00567677</td>
+      <td>H2AZ08102</td>
+      <td>MCSALLY, MARTHA</td>
+      <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>26</td>
+      <td>C00567677</td>
+      <td>H2AZ08102</td>
+      <td>MCSALLY, MARTHA E. MS.</td>
+      <td>[2016]</td>
+    </tr>
+    <tr>
+      <td>27</td>
+      <td>C00567677</td>
+      <td>H4CA45097</td>
+      <td>WALTERS, MIMI</td>
+      <td>[2020]</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
 </div>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
@@ -17487,6 +19210,7 @@ select cmte_nm,
 <li>Include <code>base_cmte_master_id</code> for associating Committees with different <code>cmte_id</code>'s, but identical (<em>or similar?</em>) names</li>
 </ul>
 </li>
+<li>Create "Base Candidate" associations based on variation of Candidate IDs/name for Commmittees (identified by <code>cmte_id</code>)</li>
 </ul>
 <p>Other text fields to consider for normalization:</p>
 <ul>

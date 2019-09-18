@@ -13078,7 +13078,27 @@ div#notebook {
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
 <h1>Candidate Master &ndash; Data Quality</h1>
-<h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Candidates in the FEC data set have a unique ID assigned to them.  However, since we are combining Candidate records from multiple election cycle source files, we really should join to <code>cand</code> using both <code>cand_id</code> and <code>elect_cycle</code>.  The purpose of this notebook is to explore to "quality" of the Candidate data both within and across election cycles to see how consistent it is, and whether (and how) we can create a unified Candidate Master entity to improve referential integrity for the larger, complete data set.</p>
+<h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Candidates in the FEC data set have a unique ID assigned to them.  However, since we are combining Candidate records from multiple election cycle source files, we really should join to <code>cand</code> using both <code>cand_id</code> and <code>elect_cycle</code>.  The purpose of this notebook is to explore the "quality" of the Candidate data, both within and across election cycles, to see how consistent it is, and how we can create a unified Candidate Master entity to improve referential integrity for the larger, complete data set.</p>
+<p>Here is a list of the examinations in this notebook:</p>
+<ul>
+<li>Quality of Candidate Names (<code>cand_name</code>)</li>
+<li>Integrity of Candidate ID (<code>cand_id</code>)</li>
+<li>Consistency of names for <code>cand_id</code>'s across election cycles</li>
+<li>Multiple <code>cand_id</code>'s for identical names &ndash; within election cycles</li>
+<li>Multiple <code>cand_id</code>'s for identical names &ndash; across election cycles</li>
+</ul>
+<p>Here are additional examinations to do:</p>
+<ul>
+<li>Multiple <code>cand_id</code>'s for <em>similar</em> names &ndash; within election cycles<ul>
+<li>Look at names that are strict subsets/supersets of one another (indicating abbreviations, or dropping middle names, etc.)</li>
+<li>Look at names that only differ by quotation marks or parentheses (both are used for nicknames)</li>
+</ul>
+</li>
+<li>Multiple <code>cand_id</code>'s for <em>similar</em> names &ndash; across election cycles<ul>
+<li>Same patterns as above should be investigated</li>
+</ul>
+</li>
+</ul>
 
 </div>
 </div>
@@ -13208,7 +13228,7 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Examine-Constitution-of-Candidate-Data">Examine Constitution of Candidate Data<a class="anchor-link" href="#Examine-Constitution-of-Candidate-Data">&#182;</a></h2>
+<h2 id="Examination-of-Candidate-Data">Examination of Candidate Data<a class="anchor-link" href="#Examination-of-Candidate-Data">&#182;</a></h2>
 </div>
 </div>
 </div>
@@ -16811,25 +16831,6 @@ select cand_name,
 </div>
 </div>
 
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="To-Do">To Do<a class="anchor-link" href="#To-Do">&#182;</a></h3><p>Examine the following:</p>
-<ul>
-<li>Multiple <code>cand_id</code>'s for <em>similar</em> names &ndash; within election cycles<ul>
-<li>Look at names that are strict subsets/supersets of one another (indicating abbreviations, or dropping middle names, etc.)</li>
-<li>Look at names that only differ by quotation marks (e.g. used for nicknames)</li>
-</ul>
-</li>
-<li>Multiple <code>cand_id</code>'s for <em>similar</em> names &ndash; across election cycles<ul>
-<li>Same patterns as above should be investigated</li>
-</ul>
-</li>
-</ul>
-
-</div>
-</div>
 </div>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
