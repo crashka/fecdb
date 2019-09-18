@@ -68,8 +68,8 @@ run various matching algorithms (including manual fixups) in an attempt to achie
 (truthful?) query results.
 
 To augment the capabilities of the Individual master data, we introduce the notion of **Segments**,
-which are collections of Individuals (based on demographics, contribution history, etc.)&msash;with
-or without underlying matching associations to real-world people (called "Donors" below)&msash;that
+which are collections of Individuals (based on demographics, contribution history, etc.)&mdash;with
+or without underlying matching associations to real-world people (called "Donors" below)&mdash;that
 we may wish to consider jointly in analysis and the search for insights.
 
 Here are the tables introduced in support of the (inferred) individual master data:
