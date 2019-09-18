@@ -84,15 +84,18 @@ Here are the tables introduced in support of the (inferred) individual master da
 
 ### Status ###
 
-This is work in process.
+This is work in process (see To Do list).
 
 ### To Do ###
 
 * More/better indexes and views to support common/interesting patterns of investigation with the data
 * Metrics and reports for quality/integrity of the data
     * Understand and report on variability across time (i.e. election cycles)
+    * See `notebooks/data_quality` for more details
 * More sophisticated matching algorithm for identifying Donors (from Individuals)
     * Ability to define and test various matching algorithms against each other
+* Script to pull new data for current election cycle and append to database (without having to do an
+  entire rebuild)
 
 ## Requirements ##
 
