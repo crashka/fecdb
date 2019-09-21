@@ -18,7 +18,7 @@ inaccurate, misleading, or plainly errant interpretations and conclusions.
 ### Individual/Donor Contributions ###
 
 * Negative contribution amounts
-* Consistency of transaction types
+* Consistency of transaction types, and consideration of type in querying/accounting
 * Anomalous transaction dates
 * Use/meaning of `other_id`
 
@@ -38,9 +38,15 @@ inaccurate, misleading, or plainly errant interpretations and conclusions.
 
 * Consistency of Campaign identifying information
     * Replication within, or across, election cycles
+    * Consideration of `cand_status` in coelescing records, especially "P" value
+* Association with Candidates
+    * Use of `cand_pcc` key vs. join through `cand_cmte` intersect table, also as compared with
+      `cmte.cand_id` association
 
 ## Generic Topics/Issues ##
 
+* Fidelity of election cycle file boundaries (captured in the database as `elect_cycle` column for
+  all base tables)
 * Understand variation/changes in "quality" over time
     * Variations/changes within specific election cycles
     * Variations/changes *across* election cycles

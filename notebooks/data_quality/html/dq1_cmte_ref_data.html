@@ -2,7 +2,7 @@
 <html>
 <head><meta charset="utf-8" />
 
-<title>dq1_cmte_master_data</title>
+<title>dq1_cmte_ref_data</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
@@ -13077,7 +13077,7 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h1>Committee Master &ndash; Data Quality</h1>
+<h1>Committee Reference &ndash; Data Quality</h1>
 <h2 id="Overview">Overview<a class="anchor-link" href="#Overview">&#182;</a></h2><p>Committees in the FEC data set have a unique ID assigned to them.  However, since we are combining Committee records from multiple election cycle source files, we really should join to <code>cmte</code> using both <code>cmte_id</code> and <code>elect_cycle</code>.  The purpose of this notebook is to explore the "quality" of the Committee data, both within and across election cycles, to see how consistent it is, and how we can create a unified Committee Master entity to improve referential integrity for the larger, complete data set.</p>
 <p>Here is a list of the examinations in this notebook:</p>
 <ul>
@@ -13086,14 +13086,11 @@ div#notebook {
 <li>Consistency of names for <code>cmte_id</code>'s across election cycles</li>
 <li>Multiple <code>cmte_id</code>'s for identical names &ndash; within election cycles</li>
 <li>Multiple <code>cmte_id</code>'s for identical names &ndash; across election cycles</li>
-<li>Integrity of Candidate ID (<code>cand_id</code>)</li>
-<li>Consistency of Committee-Candidate associations (join through <code>cand_id</code>)</li>
 </ul>
 <p>Here are additional examinations to do:</p>
 <ul>
 <li>Multiple <code>cmte_id</code>'s for <em>similar</em> names &ndash; within election cycles</li>
 <li>Multiple <code>cmte_id</code>'s for <em>similar</em> names &ndash; across election cycles</li>
-<li>Consistency of Committee-Candidate associations (join through <code>cand_cmte</code> intersect table)</li>
 </ul>
 
 </div>
@@ -13243,7 +13240,8 @@ div#notebook {
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span> result &lt;&lt;
 select count(*) as count_total,
-       count(distinct cmte_id) as count_distinct
+       count(distinct cmte_id) as count_distinct_ids,
+       count(distinct cmte_nm) as count_distinct_names
   from cmte
 </pre></div>
 
@@ -13277,9 +13275,11 @@ Returning data to local variable result
 <div class="prompt input_prompt">In&nbsp;[5]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="n">cmte_count_total</span>  <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
-<span class="n">cmte_distinct_ids</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>
-<span class="s2">&quot;cmte_count_total = </span><span class="si">%d</span><span class="s2">, cmte_distinct_ids = </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">cmte_count_total</span><span class="p">,</span> <span class="n">cmte_distinct_ids</span><span class="p">)</span>
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">cmte_count_total</span>    <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+<span class="n">cmte_distinct_ids</span>   <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>
+<span class="n">cmte_distinct_names</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">])</span>
+<span class="s2">&quot;cmte_count_total = </span><span class="si">%d</span><span class="s2">, cmte_distinct_ids = </span><span class="si">%d</span><span class="s2">, cmte_distinct_names = </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> \
+    <span class="p">(</span><span class="n">cmte_count_total</span><span class="p">,</span> <span class="n">cmte_distinct_ids</span><span class="p">,</span> <span class="n">cmte_distinct_names</span><span class="p">)</span>
 </pre></div>
 
     </div>
@@ -13298,7 +13298,7 @@ Returning data to local variable result
 
 
 <div class="output_text output_subarea output_execute_result">
-<pre>&#39;cmte_count_total = 138384, cmte_distinct_ids = 45868&#39;</pre>
+<pre>&#39;cmte_count_total = 138384, cmte_distinct_ids = 45868, cmte_distinct_names = 50614&#39;</pre>
 </div>
 
 </div>
@@ -14785,7 +14785,7 @@ select elect_cycle,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Let's see if there are any duplicate <code>cmte_id</code>'s in any election cycles</p>
+<p>Let's see if there are any duplicate <code>cmte_id</code>'s in any election cycles (should also be zero)</p>
 
 </div>
 </div>
@@ -15031,7 +15031,8 @@ select ec_count,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Consistency-of-names-for-cmte_id's-across-election-cycles">Consistency of names for <code>cmte_id</code>'s across election cycles<a class="anchor-link" href="#Consistency-of-names-for-cmte_id's-across-election-cycles">&#182;</a></h3>
+<h3 id="Consistency-of-names-for-cmte_id's-across-election-cycles">Consistency of names for <code>cmte_id</code>'s across election cycles<a class="anchor-link" href="#Consistency-of-names-for-cmte_id's-across-election-cycles">&#182;</a></h3><p>Count the number of different names for Committee records (identified by <code>cmte_id</code>) appearing in multiple election cycles</p>
+
 </div>
 </div>
 </div>
@@ -15049,12 +15050,105 @@ with cmte_diff_names as (
      group by 1
     having count(distinct cmte_nm) &gt; 1
 )
+select count(*) as cmte_ids,
+       round(count(*)::numeric / :cmte_distinct_ids * 100.0, 2) as pct_cmte_ids
+  from cmte_diff_names
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+1 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[17]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>cmte_ids</th>
+      <th>pct_cmte_ids</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>4572</td>
+      <td>9.97</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Let's report by the different levels of variation on name (i.e. number of different representations)</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[18]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+with cmte_diff_names as (
+    select cmte_id,
+           count(distinct cmte_nm)     as num_diff_names,
+           array_agg(distinct cmte_nm) as diff_names
+      from cmte
+     group by 1
+    having count(distinct cmte_nm) &gt; 1
+)
 select num_diff_names,
        count(*) as cmte_ids,
        round(count(*)::numeric / :cmte_distinct_ids * 100.0, 2) as pct_cmte_ids
   from cmte_diff_names
  group by 1
- order by 1
+ order by 1 desc
 </pre></div>
 
     </div>
@@ -15079,7 +15173,7 @@ select num_diff_names,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[17]:</div>
+    <div class="prompt output_prompt">Out[18]:</div>
 
 
 
@@ -15110,51 +15204,51 @@ select num_diff_names,
   <tbody>
     <tr>
       <td>0</td>
+      <td>9</td>
       <td>2</td>
-      <td>3201</td>
-      <td>6.98</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>1</td>
-      <td>3</td>
-      <td>979</td>
-      <td>2.13</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>4</td>
-      <td>291</td>
-      <td>0.63</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>5</td>
-      <td>75</td>
-      <td>0.16</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>6</td>
-      <td>17</td>
-      <td>0.04</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>7</td>
-      <td>6</td>
-      <td>0.01</td>
-    </tr>
-    <tr>
-      <td>6</td>
       <td>8</td>
       <td>1</td>
       <td>0.00</td>
     </tr>
     <tr>
-      <td>7</td>
-      <td>9</td>
       <td>2</td>
-      <td>0.00</td>
+      <td>7</td>
+      <td>6</td>
+      <td>0.01</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>6</td>
+      <td>17</td>
+      <td>0.04</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>5</td>
+      <td>75</td>
+      <td>0.16</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>4</td>
+      <td>291</td>
+      <td>0.63</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>3</td>
+      <td>979</td>
+      <td>2.13</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>2</td>
+      <td>3201</td>
+      <td>6.98</td>
     </tr>
   </tbody>
 </table>
@@ -15177,7 +15271,7 @@ select num_diff_names,
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[18]:</div>
+<div class="prompt input_prompt">In&nbsp;[19]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -15218,7 +15312,7 @@ select cmte_id,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[18]:</div>
+    <div class="prompt output_prompt">Out[19]:</div>
 
 
 
@@ -15517,7 +15611,7 @@ select cmte_id,
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[19]:</div>
+<div class="prompt input_prompt">In&nbsp;[20]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -15558,7 +15652,7 @@ select cmte_id,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[19]:</div>
+    <div class="prompt output_prompt">Out[20]:</div>
 
 
 
@@ -15862,7 +15956,7 @@ select cmte_id,
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[20]:</div>
+<div class="prompt input_prompt">In&nbsp;[21]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -15903,7 +15997,7 @@ select cmte_id,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[20]:</div>
+    <div class="prompt output_prompt">Out[21]:</div>
 
 
 
@@ -16205,14 +16299,235 @@ select cmte_id,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3>Multiple <code>cmte_id</code>'s for identical names &ndash; within election cycles</h3>
+<p>And for the fun of it, let's look at the most extreme examples (<code>num_diff_names</code> &gt; 7)</p>
 
 </div>
 </div>
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[21]:</div>
+<div class="prompt input_prompt">In&nbsp;[22]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+with cmte_diff_names as (
+    select cmte_id,
+           count(distinct cmte_nm)     as num_diff_names,
+           array_agg(distinct cmte_nm) as diff_names
+      from cmte
+     group by 1
+    having count(distinct cmte_nm) &gt; 7
+)
+select cmte_id,
+       unnest(diff_names) as cmte_nm
+  from cmte_diff_names
+ order by cmte_id
+ limit 100
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+26 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[22]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>cmte_id</th>
+      <th>cmte_nm</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>C00077701</td>
+      <td>KRAFT FOOD INC POLITICAL ACTION COMMITTEE (KF ...</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>C00077701</td>
+      <td>KRAFT FOODS GLOBAL INC. POLITICAL ACTION COMMI...</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>C00077701</td>
+      <td>KRAFT FOODS GLOBAL INC. POLITICAL ACTION COMMI...</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>C00077701</td>
+      <td>KRAFT FOODS GLOBAL INC. POLITICAL ACTION COMMI...</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>C00077701</td>
+      <td>KRAFT FOODS GROUP INC. POLITICAL ACTION COMMIT...</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>C00077701</td>
+      <td>KRAFT FOODS GROUP, INC. POLITICAL ACTION COMMI...</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>C00077701</td>
+      <td>KRAFT FOODS NORTH AMERICA INC. POLTICAL ACTION...</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>C00077701</td>
+      <td>THE KRAFT HEINZ COMPANY POLITICAL ACTION COMMI...</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>C00113753</td>
+      <td>JOHNSON CONTROLS INC. PAC</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>C00113753</td>
+      <td>MALLINCKRODT INC. POLITICAL ACTION COMMITTEE</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>C00113753</td>
+      <td>MALLINCKRODT INC POLITICAL ACTION COMMITTEE (M...</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>C00113753</td>
+      <td>TYCO INTERNATIONAL MANAGEMENT COMPANY EMPLOYEE...</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>C00113753</td>
+      <td>TYCO INTERNATIONAL MANAGEMENT COMPANY EMPLOYEE...</td>
+    </tr>
+    <tr>
+      <td>13</td>
+      <td>C00113753</td>
+      <td>TYCO INTERNATIONAL MANAGEMENT COMPANY PAC</td>
+    </tr>
+    <tr>
+      <td>14</td>
+      <td>C00113753</td>
+      <td>TYCO INTERNATIONAL MANAGEMENT COMPANY PAC (TYC...</td>
+    </tr>
+    <tr>
+      <td>15</td>
+      <td>C00113753</td>
+      <td>TYCO INTERNATIONAL (US) INC. EMPLOYEES POLITIC...</td>
+    </tr>
+    <tr>
+      <td>16</td>
+      <td>C00113753</td>
+      <td>TYCO INTERNATIONAL (US) INC. EMPLOYEES POLITIC...</td>
+    </tr>
+    <tr>
+      <td>17</td>
+      <td>C00140590</td>
+      <td>CALIFORNIA REPUBLICAN PARTY</td>
+    </tr>
+    <tr>
+      <td>18</td>
+      <td>C00140590</td>
+      <td>CALIFORNIA REPUBLICAN PARTY FEDERAL ACCT</td>
+    </tr>
+    <tr>
+      <td>19</td>
+      <td>C00140590</td>
+      <td>CALIFORNIA REPUBLICAN PARTY FEDERAL ACCT.</td>
+    </tr>
+    <tr>
+      <td>20</td>
+      <td>C00140590</td>
+      <td>CALIFORNIA REPUBLICAN PARTY / TEAM CALIFORNIA</td>
+    </tr>
+    <tr>
+      <td>21</td>
+      <td>C00140590</td>
+      <td>CALIFORNIA REPUBLICAN PARTY/V10</td>
+    </tr>
+    <tr>
+      <td>22</td>
+      <td>C00140590</td>
+      <td>CALIFORNIA REPUBLICAN PARTY/V8</td>
+    </tr>
+    <tr>
+      <td>23</td>
+      <td>C00140590</td>
+      <td>CALIFORNIA REPUBLICAN PARTY/VICTORY 2006</td>
+    </tr>
+    <tr>
+      <td>24</td>
+      <td>C00140590</td>
+      <td>CALIFORNIA STATE REPUBLICAN PARTY</td>
+    </tr>
+    <tr>
+      <td>25</td>
+      <td>C00140590</td>
+      <td>VICTORY 2004/CALIFORNIA REPUBLICAN PARTY</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3>Multiple <code>cmte_id</code>'s for identical names &ndash; within election cycles</h3>
+<p>Let's first see how many names are involved, and what percentage of total distinct names that represents</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[23]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -16221,11 +16536,107 @@ with shared_cmte_name as (
            cmte_nm,
            count(*) as num_shares
       from cmte
+     where cmte_nm is not null
+     group by 1, 2
+    having count(*) &gt; 1
+)
+select count(*) as shared_names,
+       round(count(*)::numeric / :cmte_distinct_names * 100.0, 2) as pct_distinct_names
+  from shared_cmte_name
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre> * postgresql+psycopg2://crash@caladan/fecdb
+1 rows affected.
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[23]:</div>
+
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>shared_names</th>
+      <th>pct_distinct_names</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>1412</td>
+      <td>2.79</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Now we'll report by the level of replication (name sharing by different Committees, as identified by <code>cmte_id</code>) we have in various cycles; note that the same name may "offend" (map to multiple <code>cmte_id</code>'s) within different election cycles (either in the same, or differing, "num_shares")</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[24]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
+with shared_cmte_name as (
+    select elect_cycle,
+           cmte_nm,
+           count(*) as num_shares
+      from cmte
+     where cmte_nm is not null
      group by 1, 2
     having count(*) &gt; 1
 )
 select num_shares,
-       count(*) as shared_names
+       count(*) as shared_names,
+       array_agg(distinct elect_cycle) as elect_cycles
   from shared_cmte_name
  group by 1
  order by 1 desc
@@ -16246,14 +16657,14 @@ select num_shares,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@caladan/fecdb
-5 rows affected.
+4 rows affected.
 </pre>
 </div>
 </div>
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[21]:</div>
+    <div class="prompt output_prompt">Out[24]:</div>
 
 
 
@@ -16278,33 +16689,33 @@ select num_shares,
       <th></th>
       <th>num_shares</th>
       <th>shared_names</th>
+      <th>elect_cycles</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>0</td>
-      <td>9</td>
-      <td>1</td>
+      <td>5</td>
+      <td>5</td>
+      <td>[2000, 2012, 2016, 2018, 2020]</td>
     </tr>
     <tr>
       <td>1</td>
-      <td>5</td>
-      <td>5</td>
-    </tr>
-    <tr>
-      <td>2</td>
       <td>4</td>
       <td>12</td>
+      <td>[2000, 2008, 2010, 2012, 2014, 2016, 2018]</td>
     </tr>
     <tr>
-      <td>3</td>
+      <td>2</td>
       <td>3</td>
       <td>70</td>
+      <td>[2000, 2002, 2004, 2006, 2008, 2010, 2012, 201...</td>
     </tr>
     <tr>
-      <td>4</td>
+      <td>3</td>
       <td>2</td>
       <td>1325</td>
+      <td>[2000, 2002, 2004, 2006, 2008, 2010, 2012, 201...</td>
     </tr>
   </tbody>
 </table>
@@ -16317,9 +16728,17 @@ select num_shares,
 </div>
 
 </div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Let's take a look at some of the top offenders (see "elect_cycles" for multiple offenses of the same "num_shares" by a name)</p>
+
+</div>
+</div>
+</div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[22]:</div>
+<div class="prompt input_prompt">In&nbsp;[25]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -16329,6 +16748,7 @@ with shared_cmte_name as (
            count(*) as num_shares,
            array_agg(distinct cmte_id) as cmte_ids
       from cmte
+     where cmte_nm is not null
      group by 1, 2
     having count(*) &gt; 2
 )
@@ -16356,14 +16776,14 @@ select cmte_nm,
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@caladan/fecdb
-62 rows affected.
+61 rows affected.
 </pre>
 </div>
 </div>
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[22]:</div>
+    <div class="prompt output_prompt">Out[25]:</div>
 
 
 
@@ -16395,38 +16815,38 @@ select cmte_nm,
   <tbody>
     <tr>
       <td>0</td>
-      <td>None</td>
-      <td>9</td>
-      <td>[C00575308, C00616649, C00619916, C00621201, C...</td>
-      <td>[2018]</td>
-    </tr>
-    <tr>
-      <td>1</td>
       <td>COLLINS FOR CONGRESS</td>
       <td>5</td>
       <td>[C00502039, C00520379, C00521641, C00544684, C...</td>
       <td>[2016, 2018, 2020]</td>
     </tr>
     <tr>
-      <td>2</td>
+      <td>1</td>
       <td>COLLINS FOR CONGRESS</td>
       <td>5</td>
       <td>[C00245712, C00250605, C00270983, C00331124, C...</td>
       <td>[2000]</td>
     </tr>
     <tr>
-      <td>3</td>
+      <td>2</td>
       <td>MOORE FOR CONGRESS</td>
       <td>5</td>
       <td>[C00331066, C00397505, C00464578, C00508853, C...</td>
       <td>[2012]</td>
     </tr>
     <tr>
-      <td>4</td>
+      <td>3</td>
       <td>CLEAN WATER ACTION PROJECT</td>
       <td>4</td>
       <td>[C70001839, C70001862, C70001870, C70002324]</td>
       <td>[2016, 2018]</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>COLLINS FOR CONGRESS</td>
+      <td>4</td>
+      <td>[C00502039, C00520379, C00521641, C00544684]</td>
+      <td>[2014]</td>
     </tr>
     <tr>
       <td>5</td>
@@ -16437,10 +16857,10 @@ select cmte_nm,
     </tr>
     <tr>
       <td>6</td>
-      <td>COLLINS FOR CONGRESS</td>
+      <td>KELLY FOR CONGRESS</td>
       <td>4</td>
-      <td>[C00502039, C00520379, C00521641, C00544684]</td>
-      <td>[2014]</td>
+      <td>[C00352732, C00417998, C00444216, C00460808]</td>
+      <td>[2010]</td>
     </tr>
     <tr>
       <td>7</td>
@@ -16451,177 +16871,177 @@ select cmte_nm,
     </tr>
     <tr>
       <td>8</td>
-      <td>KELLY FOR CONGRESS</td>
-      <td>4</td>
-      <td>[C00352732, C00417998, C00444216, C00460808]</td>
-      <td>[2010]</td>
-    </tr>
-    <tr>
-      <td>9</td>
       <td>KENNEDY FOR CONGRESS</td>
       <td>4</td>
       <td>[C00287078, C00347203, C00357046, C00360032]</td>
       <td>[2000]</td>
     </tr>
     <tr>
-      <td>10</td>
+      <td>9</td>
       <td>MOORE FOR CONGRESS</td>
       <td>4</td>
       <td>[C00397505, C00464578, C00508853, C00555185]</td>
       <td>[2014]</td>
     </tr>
     <tr>
-      <td>11</td>
+      <td>10</td>
       <td>PARKER FOR CONGRESS</td>
       <td>4</td>
       <td>[C00285569, C00449140, C00474254, C00478180]</td>
       <td>[2010]</td>
     </tr>
     <tr>
-      <td>12</td>
+      <td>11</td>
       <td>PETERSON FOR CONGRESS</td>
       <td>4</td>
       <td>[C00253187, C00287276, C00339754, C00339770]</td>
       <td>[2000]</td>
     </tr>
     <tr>
-      <td>13</td>
+      <td>12</td>
       <td>ROBINSON FOR CONGRESS</td>
       <td>4</td>
       <td>[C00386359, C00417212, C00428185, C00443788]</td>
       <td>[2008]</td>
     </tr>
     <tr>
-      <td>14</td>
+      <td>13</td>
       <td>WILLIAMS FOR CONGRESS</td>
       <td>4</td>
       <td>[C00574541, C00590091, C00640110, C00677062]</td>
       <td>[2018]</td>
     </tr>
     <tr>
-      <td>15</td>
+      <td>14</td>
       <td>SUSAN B ANTHONY LIST INC</td>
       <td>3</td>
       <td>[C30000921, C70004676, C90011313]</td>
       <td>[2010, 2012, 2014, 2016, 2018]</td>
     </tr>
     <tr>
-      <td>16</td>
+      <td>15</td>
       <td>AMERICAN CONSERVATIVE UNION</td>
       <td>3</td>
       <td>[C00130658, C30001952, C90013236]</td>
       <td>[2012, 2014, 2016, 2018]</td>
     </tr>
     <tr>
-      <td>17</td>
+      <td>16</td>
       <td>AMERICANS FOR PROSPERITY</td>
       <td>3</td>
       <td>[C30001051, C30001960, C90013285]</td>
       <td>[2012, 2014, 2016, 2018]</td>
     </tr>
     <tr>
-      <td>18</td>
+      <td>17</td>
       <td>COLLINS FOR CONGRESS</td>
       <td>3</td>
       <td>[C00245712, C00335695, C00364752]</td>
       <td>[2002, 2004]</td>
     </tr>
     <tr>
-      <td>19</td>
+      <td>18</td>
       <td>COMMITTEE TO ELECT GARY WINTERS</td>
       <td>3</td>
       <td>[C00356436, C00358028, C00358077]</td>
       <td>[2000, 2002]</td>
     </tr>
     <tr>
-      <td>20</td>
+      <td>19</td>
       <td>LATINOS FOR REFORM</td>
       <td>3</td>
       <td>[C00490771, C30001390, C90012295]</td>
       <td>[2016, 2018]</td>
     </tr>
     <tr>
-      <td>21</td>
+      <td>20</td>
       <td>NATIONAL ASSOCIATION OF HOME BUILDERS</td>
       <td>3</td>
       <td>[C30001366, C70002712, C90016437]</td>
       <td>[2016, 2018]</td>
     </tr>
     <tr>
-      <td>22</td>
+      <td>21</td>
       <td>NATIONAL COMMITTEE TO PRESERVE SOCIAL SECURITY...</td>
       <td>3</td>
       <td>[C70002605, C70005582, C90013459]</td>
       <td>[2016, 2018]</td>
     </tr>
     <tr>
-      <td>23</td>
+      <td>22</td>
       <td>NATIONAL EDUCATION ASSOCIATION</td>
       <td>3</td>
       <td>[C30000848, C70000492, C70002209]</td>
       <td>[2016, 2018]</td>
     </tr>
     <tr>
-      <td>24</td>
+      <td>23</td>
       <td>NEVADA STATE EDUCATION ASSOCIATION</td>
       <td>3</td>
       <td>[C70002332, C70005939, C90012410]</td>
       <td>[2016, 2018]</td>
     </tr>
     <tr>
-      <td>25</td>
+      <td>24</td>
       <td>RICHARDSON FOR CONGRESS</td>
       <td>3</td>
       <td>[C00370536, C00371831, C00372151]</td>
       <td>[2002, 2004]</td>
     </tr>
     <tr>
-      <td>26</td>
+      <td>25</td>
       <td>SCHNEIDER FOR CONGRESS</td>
       <td>3</td>
       <td>[C00374751, C00495952, C00672956]</td>
       <td>[2018, 2020]</td>
     </tr>
     <tr>
-      <td>27</td>
+      <td>26</td>
       <td>SCHRINER PRESIDENTIAL ELECTION COMMITTEE</td>
       <td>3</td>
       <td>[C00349555, C00385153, C00416008]</td>
       <td>[2006, 2008]</td>
     </tr>
     <tr>
-      <td>28</td>
+      <td>27</td>
       <td>SIERRA CLUB</td>
       <td>3</td>
       <td>[C30000962, C70001318, C90011875]</td>
       <td>[2016, 2018]</td>
     </tr>
     <tr>
-      <td>29</td>
+      <td>28</td>
       <td>THOMAS FOR CONGRESS</td>
       <td>3</td>
       <td>[C00321653, C00374561, C00384222]</td>
       <td>[2004, 2006]</td>
     </tr>
     <tr>
-      <td>30</td>
+      <td>29</td>
       <td>US CHAMBER OF COMMERCE</td>
       <td>3</td>
       <td>[C30001101, C70004395, C90013145]</td>
       <td>[2016, 2018]</td>
     </tr>
     <tr>
-      <td>31</td>
+      <td>30</td>
       <td>ANDERSON FOR CONGRESS</td>
       <td>3</td>
       <td>[C00422972, C00462549, C00464172]</td>
       <td>[2010]</td>
     </tr>
     <tr>
-      <td>32</td>
+      <td>31</td>
       <td>BROWN FOR CONGRESS</td>
       <td>3</td>
       <td>[C00416164, C00443069, C00485391]</td>
+      <td>[2010]</td>
+    </tr>
+    <tr>
+      <td>32</td>
+      <td>CAMPBELL FOR CONGRESS</td>
+      <td>3</td>
+      <td>[C00418244, C00440685, C00484998]</td>
       <td>[2010]</td>
     </tr>
     <tr>
@@ -16633,73 +17053,73 @@ select cmte_nm,
     </tr>
     <tr>
       <td>34</td>
-      <td>CAMPBELL FOR CONGRESS</td>
-      <td>3</td>
-      <td>[C00418244, C00440685, C00484998]</td>
-      <td>[2010]</td>
-    </tr>
-    <tr>
-      <td>35</td>
       <td>CANNON FOR CONGRESS</td>
       <td>3</td>
       <td>[C00344705, C00547794, C00585638]</td>
       <td>[2016]</td>
     </tr>
     <tr>
-      <td>36</td>
+      <td>35</td>
       <td>CLARK FOR CONGRESS</td>
       <td>3</td>
       <td>[C00400275, C00449991, C00452722]</td>
       <td>[2008]</td>
     </tr>
     <tr>
-      <td>37</td>
+      <td>36</td>
       <td>DAVIS FOR CONGRESS</td>
       <td>3</td>
       <td>[C00421909, C00439901, C00449371]</td>
       <td>[2008]</td>
     </tr>
     <tr>
-      <td>38</td>
+      <td>37</td>
       <td>FLETCHER FOR CONGRESS</td>
       <td>3</td>
       <td>[C00313999, C00327833, C00344150]</td>
       <td>[2000]</td>
     </tr>
     <tr>
-      <td>39</td>
+      <td>38</td>
       <td>ISAKSON VICTORY COMMITTEE</td>
       <td>3</td>
       <td>[C00490284, C00577635, C00639328]</td>
       <td>[2018]</td>
     </tr>
     <tr>
-      <td>40</td>
+      <td>39</td>
       <td>KELLY FOR CONGRESS</td>
       <td>3</td>
       <td>[C00352732, C00417998, C00444216]</td>
       <td>[2008]</td>
     </tr>
     <tr>
-      <td>41</td>
+      <td>40</td>
       <td>KENNEDY FOR CONGRESS</td>
       <td>3</td>
       <td>[C00347203, C00357046, C00360032]</td>
       <td>[2002]</td>
     </tr>
     <tr>
-      <td>42</td>
+      <td>41</td>
       <td>LUCAS FOR CONGRESS</td>
       <td>3</td>
       <td>[C00287912, C00328922, C00366146]</td>
       <td>[2004]</td>
     </tr>
     <tr>
-      <td>43</td>
+      <td>42</td>
       <td>MILLENNIAL PAC</td>
       <td>3</td>
       <td>[C00571257, C00607168, C00690347]</td>
       <td>[2018]</td>
+    </tr>
+    <tr>
+      <td>43</td>
+      <td>MOORE FOR CONGRESS</td>
+      <td>3</td>
+      <td>[C00331066, C00397505, C00397927]</td>
+      <td>[2004]</td>
     </tr>
     <tr>
       <td>44</td>
@@ -16717,52 +17137,52 @@ select cmte_nm,
     </tr>
     <tr>
       <td>46</td>
-      <td>MOORE FOR CONGRESS</td>
-      <td>3</td>
-      <td>[C00331066, C00397505, C00397927]</td>
-      <td>[2004]</td>
-    </tr>
-    <tr>
-      <td>47</td>
       <td>MORGAN FOR CONGRESS</td>
       <td>3</td>
       <td>[C00463406, C00505164, C90011149]</td>
       <td>[2012]</td>
     </tr>
     <tr>
-      <td>48</td>
+      <td>47</td>
       <td>MORGAN FOR CONGRESS</td>
       <td>3</td>
       <td>[C00505164, C00590976, C90011149]</td>
       <td>[2016]</td>
     </tr>
     <tr>
-      <td>49</td>
+      <td>48</td>
       <td>PHELPS FOR CONGRESS</td>
       <td>3</td>
       <td>[C00327205, C00327932, C00352484]</td>
       <td>[2000]</td>
     </tr>
     <tr>
-      <td>50</td>
+      <td>49</td>
       <td>PORTER FOR CONGRESS</td>
       <td>3</td>
       <td>[C00388637, C00516567, C00518399]</td>
       <td>[2012]</td>
     </tr>
     <tr>
-      <td>51</td>
+      <td>50</td>
       <td>ROBERTS FOR CONGRESS</td>
       <td>3</td>
       <td>[C00312884, C00423392, C00435339]</td>
       <td>[2008]</td>
     </tr>
     <tr>
-      <td>52</td>
+      <td>51</td>
       <td>ROBINSON FOR CONGRESS</td>
       <td>3</td>
       <td>[C00386359, C00417212, C00428185]</td>
       <td>[2006]</td>
+    </tr>
+    <tr>
+      <td>52</td>
+      <td>ROGERS FOR CONGRESS</td>
+      <td>3</td>
+      <td>[C00343863, C00370155, C00379750]</td>
+      <td>[2002]</td>
     </tr>
     <tr>
       <td>53</td>
@@ -16773,55 +17193,48 @@ select cmte_nm,
     </tr>
     <tr>
       <td>54</td>
-      <td>ROGERS FOR CONGRESS</td>
-      <td>3</td>
-      <td>[C00343863, C00370155, C00379750]</td>
-      <td>[2002]</td>
-    </tr>
-    <tr>
-      <td>55</td>
       <td>RUSSELL FOR CONGRESS</td>
       <td>3</td>
       <td>[C00428292, C00444547, C00459560]</td>
       <td>[2010]</td>
     </tr>
     <tr>
-      <td>56</td>
+      <td>55</td>
       <td>SMITH FOR CONGRESS</td>
       <td>3</td>
       <td>[C00313866, C00314021, C00356055]</td>
       <td>[2000]</td>
     </tr>
     <tr>
-      <td>57</td>
+      <td>56</td>
       <td>SMITH FOR CONGRESS</td>
       <td>3</td>
       <td>[C00356055, C00429803, C00444323]</td>
       <td>[2008]</td>
     </tr>
     <tr>
-      <td>58</td>
+      <td>57</td>
       <td>SPENCER FOR CONGRESS</td>
       <td>3</td>
       <td>[C00400069, C00422063, C00459388]</td>
       <td>[2008]</td>
     </tr>
     <tr>
-      <td>59</td>
+      <td>58</td>
       <td>THOMAS FOR CONGRESS</td>
       <td>3</td>
       <td>[C00649632, C00656959, C00669812]</td>
       <td>[2018]</td>
     </tr>
     <tr>
-      <td>60</td>
+      <td>59</td>
       <td>WILSON FOR CONGRESS</td>
       <td>3</td>
       <td>[C00314500, C00354357, C00399212]</td>
       <td>[2004]</td>
     </tr>
     <tr>
-      <td>61</td>
+      <td>60</td>
       <td>WRIGHT FOR CONGRESS</td>
       <td>3</td>
       <td>[C00361907, C00373241, C00380451]</td>
@@ -16838,9 +17251,17 @@ select cmte_nm,
 </div>
 
 </div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>And we'll look at the top recurrences for cases where the number of shares is exactly two in an election cycle</p>
+
+</div>
+</div>
+</div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[23]:</div>
+<div class="prompt input_prompt">In&nbsp;[26]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
@@ -16850,6 +17271,7 @@ with shared_cmte_name as (
            count(*) as num_shares,
            array_agg(distinct cmte_id) as cmte_ids
       from cmte
+     where cmte_nm is not null
      group by 1, 2
     having count(*) = 2
 )
@@ -16885,7 +17307,7 @@ select cmte_nm,
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[23]:</div>
+    <div class="prompt output_prompt">Out[26]:</div>
 
 
 
@@ -17280,616 +17702,7 @@ select cmte_nm,
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
 <h3>Multiple <code>cmte_id</code>'s for identical names &ndash; across election cycles</h3>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[24]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-with shared_cmte_name as (
-    select cmte_nm,
-           count(distinct cmte_id) as num_cmte_ids
-      from cmte
-     group by 1
-    having count(distinct cmte_id) &gt; 1
-)
-select num_cmte_ids,
-       count(*) as num_shared_names
-  from shared_cmte_name
- group by 1
- order by 1 desc
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@caladan/fecdb
-10 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[24]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>num_cmte_ids</th>
-      <th>num_shared_names</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>13</td>
-      <td>1</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>11</td>
-      <td>1</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>9</td>
-      <td>1</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>8</td>
-      <td>1</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>7</td>
-      <td>4</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>6</td>
-      <td>4</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>5</td>
-      <td>21</td>
-    </tr>
-    <tr>
-      <td>7</td>
-      <td>4</td>
-      <td>26</td>
-    </tr>
-    <tr>
-      <td>8</td>
-      <td>3</td>
-      <td>147</td>
-    </tr>
-    <tr>
-      <td>9</td>
-      <td>2</td>
-      <td>1198</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[25]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-with shared_cmte_name as (
-    select cmte_nm,
-           count(distinct cmte_id) as num_cmte_ids,
-           array_agg(distinct cmte_id) as cmte_ids,
-           count(*) as count_records
-      from cmte
-     group by 1
-    having count(distinct cmte_id) &gt; 2
-)
-select cmte_nm,
-       num_cmte_ids,
-       cmte_ids
-  from shared_cmte_name
- order by 2 desc, 1
- limit 50
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@caladan/fecdb
-50 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[25]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>cmte_nm</th>
-      <th>num_cmte_ids</th>
-      <th>cmte_ids</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>COLLINS FOR CONGRESS</td>
-      <td>13</td>
-      <td>[C00245712, C00250605, C00270983, C00331124, C...</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>None</td>
-      <td>11</td>
-      <td>[C00575308, C00603068, C00616649, C00619916, C...</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>KELLY FOR CONGRESS</td>
-      <td>9</td>
-      <td>[C00295493, C00317834, C00323493, C00352732, C...</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>MOORE FOR CONGRESS</td>
-      <td>8</td>
-      <td>[C00320721, C00331066, C00397505, C00397927, C...</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>ANDERSON FOR CONGRESS</td>
-      <td>7</td>
-      <td>[C00310235, C00338426, C00422972, C00462549, C...</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>CAMPBELL FOR CONGRESS</td>
-      <td>7</td>
-      <td>[C00352468, C00358416, C00398313, C00412312, C...</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>ROBINSON FOR CONGRESS</td>
-      <td>7</td>
-      <td>[C00338806, C00386359, C00417212, C00428185, C...</td>
-    </tr>
-    <tr>
-      <td>7</td>
-      <td>ROGERS FOR CONGRESS</td>
-      <td>7</td>
-      <td>[C00343863, C00344507, C00344812, C00370155, C...</td>
-    </tr>
-    <tr>
-      <td>8</td>
-      <td>KENNEDY FOR CONGRESS</td>
-      <td>6</td>
-      <td>[C00287078, C00347203, C00357046, C00360032, C...</td>
-    </tr>
-    <tr>
-      <td>9</td>
-      <td>LUCAS FOR CONGRESS</td>
-      <td>6</td>
-      <td>[C00287912, C00328922, C00366146, C00419705, C...</td>
-    </tr>
-    <tr>
-      <td>10</td>
-      <td>THOMAS FOR CONGRESS</td>
-      <td>6</td>
-      <td>[C00321653, C00374561, C00384222, C00649632, C...</td>
-    </tr>
-    <tr>
-      <td>11</td>
-      <td>THOMPSON FOR CONGRESS</td>
-      <td>6</td>
-      <td>[C00356170, C00467191, C00514695, C00523365, C...</td>
-    </tr>
-    <tr>
-      <td>12</td>
-      <td>ADAMS FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00416388, C00467860, C00522797, C00580282, C...</td>
-    </tr>
-    <tr>
-      <td>13</td>
-      <td>ALASKANS FOR VONDERSAAR</td>
-      <td>5</td>
-      <td>[C00346882, C00367599, C00389908, C00415737, C...</td>
-    </tr>
-    <tr>
-      <td>14</td>
-      <td>CLARK FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00358788, C00400275, C00449991, C00452722, C...</td>
-    </tr>
-    <tr>
-      <td>15</td>
-      <td>COLE FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00337899, C00373274, C00379735, C00557108, C...</td>
-    </tr>
-    <tr>
-      <td>16</td>
-      <td>COOPER FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00322032, C00376665, C00415810, C00447839, C...</td>
-    </tr>
-    <tr>
-      <td>17</td>
-      <td>DAVIS FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00377648, C00421909, C00439901, C00449371, C...</td>
-    </tr>
-    <tr>
-      <td>18</td>
-      <td>FLETCHER FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00313999, C00327833, C00344150, C00364406, C...</td>
-    </tr>
-    <tr>
-      <td>19</td>
-      <td>GOOD GOVERNMENT FUND</td>
-      <td>5</td>
-      <td>[C00340208, C00358937, C00380261, C00404004, C...</td>
-    </tr>
-    <tr>
-      <td>20</td>
-      <td>MORGAN FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00372730, C00463406, C00505164, C00590976, C...</td>
-    </tr>
-    <tr>
-      <td>21</td>
-      <td>PARKER FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00285569, C00374074, C00449140, C00474254, C...</td>
-    </tr>
-    <tr>
-      <td>22</td>
-      <td>PETERSON FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00253187, C00287276, C00339754, C00339770, C...</td>
-    </tr>
-    <tr>
-      <td>23</td>
-      <td>PHIL NORRIS FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00508382, C00547307, C00579268, C00636241, C...</td>
-    </tr>
-    <tr>
-      <td>24</td>
-      <td>PORTER FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00284745, C00367367, C00388637, C00516567, C...</td>
-    </tr>
-    <tr>
-      <td>25</td>
-      <td>POWELL FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00299529, C00387985, C00396697, C00471961, C...</td>
-    </tr>
-    <tr>
-      <td>26</td>
-      <td>ROBERTS FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00312884, C00423392, C00435339, C00507202, C...</td>
-    </tr>
-    <tr>
-      <td>27</td>
-      <td>RUSSELL FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00327866, C00428292, C00444547, C00459560, C...</td>
-    </tr>
-    <tr>
-      <td>28</td>
-      <td>SMITH FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00313866, C00314021, C00356055, C00429803, C...</td>
-    </tr>
-    <tr>
-      <td>29</td>
-      <td>STEPP COMMITTEE</td>
-      <td>5</td>
-      <td>[C00419481, C00444398, C00475160, C00514448, C...</td>
-    </tr>
-    <tr>
-      <td>30</td>
-      <td>SULLIVAN FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00311464, C00335034, C00452441, C00652388, C...</td>
-    </tr>
-    <tr>
-      <td>31</td>
-      <td>WEGNER FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00421628, C00450031, C00470294, C00517003, C...</td>
-    </tr>
-    <tr>
-      <td>32</td>
-      <td>WILLIAMS FOR CONGRESS</td>
-      <td>5</td>
-      <td>[C00321331, C00574541, C00590091, C00640110, C...</td>
-    </tr>
-    <tr>
-      <td>33</td>
-      <td>AMERICANS FOR AMERICA</td>
-      <td>4</td>
-      <td>[C00490540, C00518340, C00565234, C00587790]</td>
-    </tr>
-    <tr>
-      <td>34</td>
-      <td>BROWN FOR CONGRESS</td>
-      <td>4</td>
-      <td>[C00375014, C00416164, C00443069, C00485391]</td>
-    </tr>
-    <tr>
-      <td>35</td>
-      <td>CLEAN WATER ACTION PROJECT</td>
-      <td>4</td>
-      <td>[C70001839, C70001862, C70001870, C70002324]</td>
-    </tr>
-    <tr>
-      <td>36</td>
-      <td>COMMITTEE TO ELECT WAYNE E HARMON</td>
-      <td>4</td>
-      <td>[C00438499, C00466805, C00546721, C00716514]</td>
-    </tr>
-    <tr>
-      <td>37</td>
-      <td>CRAMER FOR CONGRESS</td>
-      <td>4</td>
-      <td>[C00337287, C00474569, C00504704, C00555961]</td>
-    </tr>
-    <tr>
-      <td>38</td>
-      <td>CRAWFORD FOR CONGRESS</td>
-      <td>4</td>
-      <td>[C00328435, C00462374, C00550749, C00648600]</td>
-    </tr>
-    <tr>
-      <td>39</td>
-      <td>FRIENDS OF DUANE SAND</td>
-      <td>4</td>
-      <td>[C00352914, C00392712, C00395608, C00460246]</td>
-    </tr>
-    <tr>
-      <td>40</td>
-      <td>GUILD FOR CONGRESS</td>
-      <td>4</td>
-      <td>[C00480459, C00506121, C00546242, C00600890]</td>
-    </tr>
-    <tr>
-      <td>41</td>
-      <td>HELLER VICTORY COMMITTEE</td>
-      <td>4</td>
-      <td>[C00498782, C00543108, C00607812, C00630889]</td>
-    </tr>
-    <tr>
-      <td>42</td>
-      <td>HUGHES FOR CONGRESS</td>
-      <td>4</td>
-      <td>[C00290163, C00419846, C00551309, C00610071]</td>
-    </tr>
-    <tr>
-      <td>43</td>
-      <td>ISAKSON VICTORY COMMITTEE</td>
-      <td>4</td>
-      <td>[C00404723, C00490284, C00577635, C00639328]</td>
-    </tr>
-    <tr>
-      <td>44</td>
-      <td>MARK GIBSON FOR CONGRESS</td>
-      <td>4</td>
-      <td>[C00524645, C00557538, C00558783, C00597005]</td>
-    </tr>
-    <tr>
-      <td>45</td>
-      <td>MILLER FOR CONGRESS</td>
-      <td>4</td>
-      <td>[C00344614, C00397018, C00496356, C00633453]</td>
-    </tr>
-    <tr>
-      <td>46</td>
-      <td>MONTOYA FOR CONGRESS</td>
-      <td>4</td>
-      <td>[C00480327, C00505172, C00554139, C00715920]</td>
-    </tr>
-    <tr>
-      <td>47</td>
-      <td>MURRAY FOR CONGRESS</td>
-      <td>4</td>
-      <td>[C00269589, C00300780, C00364026, C00396317]</td>
-    </tr>
-    <tr>
-      <td>48</td>
-      <td>PHELPS FOR CONGRESS</td>
-      <td>4</td>
-      <td>[C00327205, C00327932, C00352484, C00385542]</td>
-    </tr>
-    <tr>
-      <td>49</td>
-      <td>PHILLIPS FOR CONGRESS</td>
-      <td>4</td>
-      <td>[C00339044, C00387118, C00441212, C00600833]</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Integrity-of-Candidate-ID-(cand_id)">Integrity of Candidate ID (<code>cand_id</code>)<a class="anchor-link" href="#Integrity-of-Candidate-ID-(cand_id)">&#182;</a></h3><p>Let's check the number (and percentage) of null <code>cand_id</code>'s, which presumably represent Committees with no Candidate association.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[26]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select count(*) as null_cand_ids,
-       round(count(*)::numeric / :cmte_count_total * 100.0, 2) as pct_null_cand_ids
-  from cmte
- where cand_id is null
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@caladan/fecdb
-1 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[26]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>null_cand_ids</th>
-      <th>pct_null_cand_ids</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>86964</td>
-      <td>62.84</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Same thing, but only looking at distinct <code>cmte_id</code>'s (i.e. across election cycles)</p>
+<p>As above, we'll see how many names are mapped to different <code>cmte_id</code>'s, except now <em>across</em> election cycles</p>
 
 </div>
 </div>
@@ -17900,10 +17713,19 @@ select count(*) as null_cand_ids,
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select count(distinct cmte_id) as distinct_null_cand_ids,
-       round(count(distinct cmte_id)::numeric / :cmte_distinct_ids * 100.0, 2) as pct_distinct_null_cand_ids
-  from cmte
- where cand_id is null
+with shared_cmte_name as (
+    select cm.cmte_nm,
+           count(distinct cm2.cmte_id) as num_cmte_ids,
+           array_agg(distinct cm2.elect_cycle) as elect_cycles
+      from cmte cm
+      join cmte cm2 on  cm2.cmte_nm      = cm.cmte_nm
+                    and cm2.cmte_id     != cm.cmte_id
+                    and cm2.elect_cycle != cm.elect_cycle
+     group by 1
+)
+select count(*) as shared_names,
+       round(count(*)::numeric / :cmte_distinct_names * 100.0, 2) as pct_distinct_names
+  from shared_cmte_name
 </pre></div>
 
     </div>
@@ -17951,15 +17773,15 @@ select count(distinct cmte_id) as distinct_null_cand_ids,
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>distinct_null_cand_ids</th>
-      <th>pct_distinct_null_cand_ids</th>
+      <th>shared_names</th>
+      <th>pct_distinct_names</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>0</td>
-      <td>23865</td>
-      <td>52.03</td>
+      <td>1370</td>
+      <td>2.71</td>
     </tr>
   </tbody>
 </table>
@@ -17975,7 +17797,7 @@ select count(distinct cmte_id) as distinct_null_cand_ids,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Now let's look for <code>cand_id</code>'s that don't join to Candidate records from the same election cycle (<code>cand</code> and <code>cmte</code> files should be published together by election cycle)</p>
+<p>And now report by the level of replication (name sharing by different Committees) we have in across cycles</p>
 
 </div>
 </div>
@@ -17986,9 +17808,21 @@ select count(distinct cmte_id) as distinct_null_cand_ids,
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select count(*)
-  from cmte
- where (cand_id, elect_cycle) not in (select cand_id, elect_cycle from cand)
+with shared_cmte_name as (
+    select cm.cmte_nm,
+           count(distinct cm2.cmte_id) as num_cmte_ids,
+           array_agg(distinct cm2.elect_cycle) as elect_cycles
+      from cmte cm
+      join cmte cm2 on  cm2.cmte_nm      = cm.cmte_nm
+                    and cm2.cmte_id     != cm.cmte_id
+                    and cm2.elect_cycle != cm.elect_cycle
+     group by 1
+)
+select num_cmte_ids,
+       count(*) as num_shared_names
+  from shared_cmte_name
+ group by 1
+ order by 1 desc
 </pre></div>
 
     </div>
@@ -18006,7 +17840,7 @@ select count(*)
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@caladan/fecdb
-1 rows affected.
+9 rows affected.
 </pre>
 </div>
 </div>
@@ -18036,13 +17870,55 @@ select count(*)
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>count</th>
+      <th>num_cmte_ids</th>
+      <th>num_shared_names</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>0</td>
-      <td>18</td>
+      <td>13</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>9</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>8</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>7</td>
+      <td>4</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>6</td>
+      <td>4</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>5</td>
+      <td>21</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>4</td>
+      <td>26</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>3</td>
+      <td>147</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>2</td>
+      <td>1165</td>
     </tr>
   </tbody>
 </table>
@@ -18058,7 +17934,7 @@ select count(*)
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Of those, let's see how many of the <code>cand_id</code>'s just point into outer space (i.e. don't exist in any election cycle Candidate data)</p>
+<p>And we'll take a look at the top offenders for this replication</p>
 
 </div>
 </div>
@@ -18069,9 +17945,23 @@ select count(*)
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select count(*)
-  from cmte
- where (cand_id) not in (select cand_id from cand)
+with shared_cmte_name as (
+    select cm.cmte_nm,
+           count(distinct cm2.cmte_id) as num_cmte_ids,
+           array_agg(distinct cm2.cmte_id) as cmte_ids,
+           count(*) as count_records
+      from cmte cm
+      join cmte cm2 on  cm2.cmte_nm      = cm.cmte_nm
+                    and cm2.cmte_id     != cm.cmte_id
+                    and cm2.elect_cycle != cm.elect_cycle
+     group by 1
+)
+select cmte_nm,
+       num_cmte_ids,
+       cmte_ids
+  from shared_cmte_name
+ order by 2 desc, 1
+ limit 50
 </pre></div>
 
     </div>
@@ -18089,7 +17979,7 @@ select count(*)
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre> * postgresql+psycopg2://crash@caladan/fecdb
-1 rows affected.
+50 rows affected.
 </pre>
 </div>
 </div>
@@ -18119,1070 +18009,311 @@ select count(*)
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>count</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>11</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Let's take a look at those, and see if there are perhaps other Committee records with the same <code>cmte_id</code> that
-<em>do</em> join to Candidate records</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[30]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select cmte.cmte_id,
-       cmte.cmte_nm,
-       count(*),
-       array_agg(distinct cmte.elect_cycle) as elect_cycles,
-       array_agg(distinct cmte.cand_id)     as bad_cand_ids,
-       array_agg(distinct cand2.cand_id)    as other_cand_ids
-  from cmte
-  left join cmte cmte2 on  cmte2.cmte_id     = cmte.cmte_id
-  left join cand cand2 on  cand2.cand_id     = cmte2.cand_id
-                       and cand2.elect_cycle = cmte2.elect_cycle
- where (cmte.cand_id) not in (select cand_id from cand)
- group by 1, 2
- order by 1, 2
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@caladan/fecdb
-8 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[30]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>cmte_id</th>
       <th>cmte_nm</th>
-      <th>count</th>
-      <th>elect_cycles</th>
-      <th>bad_cand_ids</th>
-      <th>other_cand_ids</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>C00356071</td>
-      <td>BILL HAAS FOR CONGRESS (1ST DISTRICT MISSOURI)</td>
-      <td>4</td>
-      <td>[2000, 2002]</td>
-      <td>[H0MO01082]</td>
-      <td>[None]</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>C00363937</td>
-      <td>MIKE GALLAGHER FOR CONGRESS</td>
-      <td>2</td>
-      <td>[2000]</td>
-      <td>[H0FL15047]</td>
-      <td>[None]</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>C00625046</td>
-      <td>COMMITTEE TO ELECT BENJAMIN NOFS</td>
-      <td>4</td>
-      <td>[2016, 2018]</td>
-      <td>[H6MD10024]</td>
-      <td>[None]</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>C00626838</td>
-      <td>SHELLY SCHRATZ FOR CONGRESS</td>
-      <td>1</td>
-      <td>[2016]</td>
-      <td>[H6NY26123]</td>
-      <td>[None]</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>C00650424</td>
-      <td>DWIGHT BRADY FOR CONGRESS</td>
-      <td>1</td>
-      <td>[2018]</td>
-      <td>[H8MI01156]</td>
-      <td>[None]</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>C00677690</td>
-      <td>WASHINGTON FOR CONGRESS COMMITTEE</td>
-      <td>4</td>
-      <td>[2018, 2020]</td>
-      <td>[H8PA13158]</td>
-      <td>[None]</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>C00712851</td>
-      <td>AMERICAN RELIGIOUS  PARTY</td>
-      <td>1</td>
-      <td>[2020]</td>
-      <td>[C00713602]</td>
-      <td>[None]</td>
-    </tr>
-    <tr>
-      <td>7</td>
-      <td>C00716191</td>
-      <td>LOGAN WILDE FOR CONGRESS</td>
-      <td>1</td>
-      <td>[2020]</td>
-      <td>[H0UT01122]</td>
-      <td>[None]</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Now we'll take a look at the <code>cmte-cand</code> joins that don't match within the election cycles they came with, but do join across disparate election cycles</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[31]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select count(*)
-  from cmte
- where (cand_id, elect_cycle) not in (select cand_id, elect_cycle from cand)
-   and (cand_id) in (select cand_id from cand)
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@caladan/fecdb
-1 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[31]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>count</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>7</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[32]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select cmte.cmte_id,
-       cmte.cmte_nm,
-       cmte.elect_cycle as cmte_ec,
-       cmte.cand_id,
-       array_agg(distinct cand.cand_name) as cand_names,
-       array_agg(distinct cand.elect_cycle) as cand_elect_cycles
-  from cmte
-  join cand on cand.cand_id = cmte.cand_id
- where (cmte.cand_id, cmte.elect_cycle) not in (select cand_id, elect_cycle from cand)
- group by 1, 2, 3, 4
- order by 1, 2, 3, 4
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@caladan/fecdb
-7 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[32]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>cmte_id</th>
-      <th>cmte_nm</th>
-      <th>cmte_ec</th>
-      <th>cand_id</th>
-      <th>cand_names</th>
-      <th>cand_elect_cycles</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>C00330043</td>
-      <td>ROSKAM FOR CONGRESS COMMITTEE</td>
-      <td>2000</td>
-      <td>H6IL06117</td>
-      <td>[ROSKAM, PETER]</td>
-      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>C00342261</td>
-      <td>PEOPLE FOR AMERICAN LEADERSHIP</td>
-      <td>2000</td>
-      <td>P00003392</td>
-      <td>[CLINTON, HILLARY RODHAM, CLINTON, HILLARY ROD...</td>
-      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>C00390468</td>
-      <td>DRAFT HILLARY FOR PRESIDENT 2004</td>
-      <td>2004</td>
-      <td>P00003392</td>
-      <td>[CLINTON, HILLARY RODHAM, CLINTON, HILLARY ROD...</td>
-      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>C00400473</td>
-      <td>HILLARY CLINTON FOR PRESIDENT 2008</td>
-      <td>2004</td>
-      <td>P00003392</td>
-      <td>[CLINTON, HILLARY RODHAM, CLINTON, HILLARY ROD...</td>
-      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>C00459768</td>
-      <td>JOSE RUIZ FOR CONGRESS COMMITTEE</td>
-      <td>2012</td>
-      <td>H0FL19049</td>
-      <td>[RUIZ, JOSE M]</td>
-      <td>[2010, 2014, 2016, 2018]</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>C00636308</td>
-      <td>GABRIEL MCARTHUR FOR CONGRESS</td>
-      <td>2018</td>
-      <td>H8C006211</td>
-      <td>[MCARTHUR, GABRIEL SHAWN MR.]</td>
-      <td>[2016]</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>C00636308</td>
-      <td>GABRIEL MCARTHUR FOR CONGRESS</td>
-      <td>2020</td>
-      <td>H8C006211</td>
-      <td>[MCARTHUR, GABRIEL SHAWN MR.]</td>
-      <td>[2016]</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Consistency-of-Committee-Candidate-associations-(join-through-cand_id)">Consistency of Committee-Candidate associations (join through <code>cand_id</code>)<a class="anchor-link" href="#Consistency-of-Committee-Candidate-associations-(join-through-cand_id)">&#182;</a></h3><p>We first check for <code>cmte_id</code>'s with different <code>cand_id</code>'s within any election cycle</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[33]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-with ec_cmte_cand_diffs as (
-    select elect_cycle,
-           cmte_id,
-           count(distinct cand_id) as distinct_cand_ids,
-           array_agg(distinct cand_id) as cand_ids
-      from cmte
-     group by 1, 2
-    having count(distinct cand_id) &gt; 1
-)
-select elect_cycle,
-       distinct_cand_ids,
-       count(*) as ec_cmte_ids
-  from ec_cmte_cand_diffs
- group by 1, 2
- order by 1, 2 desc
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@caladan/fecdb
-0 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[33]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>If not, now let's check for <code>cmte_id</code>'s with different <code>cand_id</code>'s <em>across</em> election cycles</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[34]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-with cmte_cand_diffs as (
-    select cmte_id,
-           count(distinct cand_id) as distinct_cand_ids,
-           array_agg(distinct cand_id) as cand_ids
-      from cmte
-     group by 1
-    having count(distinct cand_id) &gt; 1
-)
-select distinct_cand_ids,
-       count(*) as cmte_ids
-  from cmte_cand_diffs
- group by 1
- order by 1 desc
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@caladan/fecdb
-2 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[34]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>distinct_cand_ids</th>
+      <th>num_cmte_ids</th>
       <th>cmte_ids</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>0</td>
-      <td>3</td>
-      <td>3</td>
+      <td>COLLINS FOR CONGRESS</td>
+      <td>13</td>
+      <td>[C00245712, C00250605, C00270983, C00331124, C...</td>
     </tr>
     <tr>
       <td>1</td>
-      <td>2</td>
-      <td>228</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Let's captures some of the instances, so we can visually inspect the disparate Candidate information for a specific Committee (as identified by <code>cmte_id</code>)</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[35]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span> result &lt;&lt;
-with cmte_cand_diffs as (
-    select cmte_id,
-           count(distinct cand_id) as distinct_cand_ids,
-           array_agg(distinct cand_id) as cand_ids
-      from cmte
-     group by 1
-    having count(distinct cand_id) &gt; 1
-)
-select *
-  from cmte_cand_diffs
- order by 2 desc
- limit 50
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@caladan/fecdb
-50 rows affected.
-Returning data to local variable result
-</pre>
-</div>
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>We'll take a look at the first ten instances...</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[36]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="n">cmte_id0</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-<span class="n">cmte_id1</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-<span class="n">cmte_id2</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-<span class="n">cmte_id3</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-<span class="n">cmte_id4</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">4</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-<span class="n">cmte_id5</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">5</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-<span class="n">cmte_id6</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">6</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-<span class="n">cmte_id7</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">7</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-<span class="n">cmte_id8</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">8</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-<span class="n">cmte_id9</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">9</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-<span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">9</span><span class="p">]</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[36]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>cmte_id</th>
-      <th>distinct_cand_ids</th>
-      <th>cand_ids</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>C00354597</td>
-      <td>3</td>
-      <td>[H0NJ10117, H2FL11075, P40003345]</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>C00501197</td>
-      <td>3</td>
-      <td>[H2TX16185, P00010793, S8TX00285]</td>
+      <td>KELLY FOR CONGRESS</td>
+      <td>9</td>
+      <td>[C00295493, C00317834, C00323493, C00352732, C...</td>
     </tr>
     <tr>
       <td>2</td>
-      <td>C00567677</td>
-      <td>3</td>
-      <td>[H0NY19139, H2AZ08102, H4CA45097]</td>
+      <td>MOORE FOR CONGRESS</td>
+      <td>8</td>
+      <td>[C00320721, C00331066, C00397505, C00397927, C...</td>
     </tr>
     <tr>
       <td>3</td>
-      <td>C00254938</td>
-      <td>2</td>
-      <td>[H2DE00072, S0DE00068, None]</td>
+      <td>ANDERSON FOR CONGRESS</td>
+      <td>7</td>
+      <td>[C00310235, C00338426, C00422972, C00462549, C...</td>
     </tr>
     <tr>
       <td>4</td>
-      <td>C00266932</td>
-      <td>2</td>
-      <td>[H2GA08038, S2GA00118]</td>
+      <td>CAMPBELL FOR CONGRESS</td>
+      <td>7</td>
+      <td>[C00352468, C00358416, C00398313, C00412312, C...</td>
     </tr>
     <tr>
       <td>5</td>
-      <td>C00267708</td>
-      <td>2</td>
-      <td>[H2FL16041, S4FL00207]</td>
+      <td>ROBINSON FOR CONGRESS</td>
+      <td>7</td>
+      <td>[C00338806, C00386359, C00417212, C00428185, C...</td>
     </tr>
     <tr>
       <td>6</td>
-      <td>C00264697</td>
-      <td>2</td>
-      <td>[H2OH13033, S6OH00163]</td>
+      <td>ROGERS FOR CONGRESS</td>
+      <td>7</td>
+      <td>[C00343863, C00344507, C00344812, C00370155, C...</td>
     </tr>
     <tr>
       <td>7</td>
-      <td>C00303552</td>
-      <td>2</td>
-      <td>[H2NJ06053, S6NJ00164]</td>
-    </tr>
-    <tr>
-      <td>8</td>
-      <td>C00304758</td>
-      <td>2</td>
-      <td>[H6MO07128, S0MO00183]</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>We sort by <code>cmte_id</code>, so the variation in Candidate ID and name will be in adjacent rows.  It is interesting to see whether <code>cand_id</code> just switches at a point in time (election cycle), or whether multiple values are used haphazardly between cycles</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[37]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">%%</span><span class="k">sql</span>
-select cmte.cmte_id,
-       cand.cand_id,
-       cand.cand_name,
-       array_agg(distinct cand.elect_cycle) as elect_cycles
-  from cmte
-  join cand on  cand.cand_id     = cmte.cand_id
-            and cand.elect_cycle = cmte.elect_cycle
- where cmte.cmte_id in (:cmte_id0, :cmte_id1, :cmte_id2, :cmte_id3, :cmte_id4,
-                        :cmte_id5, :cmte_id6, :cmte_id7, :cmte_id8, :cmte_id9)
- group by 1, 2, 3
- order by 1, 2, 3
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre> * postgresql+psycopg2://crash@caladan/fecdb
-28 rows affected.
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[37]:</div>
-
-
-
-<div class="output_html rendered_html output_subarea output_execute_result">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>cmte_id</th>
-      <th>cand_id</th>
-      <th>cand_name</th>
-      <th>elect_cycles</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>C00254938</td>
-      <td>H2DE00072</td>
-      <td>CASTLE, MICHAEL N</td>
-      <td>[2000, 2002, 2004, 2006, 2008]</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>C00254938</td>
-      <td>S0DE00068</td>
-      <td>CASTLE, MICHAEL N</td>
-      <td>[2010, 2012]</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>C00264697</td>
-      <td>H2OH13033</td>
-      <td>BROWN, SHERROD</td>
-      <td>[2000, 2002, 2004]</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>C00264697</td>
-      <td>S6OH00163</td>
-      <td>BROWN, SHERROD</td>
-      <td>[2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>C00266932</td>
-      <td>H2GA08038</td>
-      <td>CHAMBLISS, SAXBY</td>
-      <td>[2000]</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>C00266932</td>
-      <td>S2GA00118</td>
-      <td>CHAMBLISS, C SAXBY</td>
-      <td>[2012, 2014, 2016, 2018, 2020]</td>
-    </tr>
-    <tr>
+      <td>KENNEDY FOR CONGRESS</td>
       <td>6</td>
-      <td>C00266932</td>
-      <td>S2GA00118</td>
-      <td>CHAMBLISS, SAXBY</td>
-      <td>[2002, 2004, 2006, 2008, 2010]</td>
-    </tr>
-    <tr>
-      <td>7</td>
-      <td>C00267708</td>
-      <td>H2FL16041</td>
-      <td>DEUTSCH, PETER R</td>
-      <td>[2000, 2002]</td>
+      <td>[C00287078, C00347203, C00357046, C00360032, C...</td>
     </tr>
     <tr>
       <td>8</td>
-      <td>C00267708</td>
-      <td>S4FL00207</td>
-      <td>DEUTSCH, PETER</td>
-      <td>[2004, 2006, 2008]</td>
+      <td>LUCAS FOR CONGRESS</td>
+      <td>6</td>
+      <td>[C00287912, C00328922, C00366146, C00419705, C...</td>
     </tr>
     <tr>
       <td>9</td>
-      <td>C00303552</td>
-      <td>H2NJ06053</td>
-      <td>SMITH, ROBERT G</td>
-      <td>[2002, 2004]</td>
+      <td>THOMAS FOR CONGRESS</td>
+      <td>6</td>
+      <td>[C00321653, C00374561, C00384222, C00649632, C...</td>
     </tr>
     <tr>
       <td>10</td>
-      <td>C00303552</td>
-      <td>S6NJ00164</td>
-      <td>SMITH, ROBERT G</td>
-      <td>[2000]</td>
+      <td>THOMPSON FOR CONGRESS</td>
+      <td>6</td>
+      <td>[C00356170, C00467191, C00514695, C00523365, C...</td>
     </tr>
     <tr>
       <td>11</td>
-      <td>C00304758</td>
-      <td>H6MO07128</td>
-      <td>BLUNT, ROY</td>
-      <td>[2000, 2002, 2004, 2006, 2008]</td>
+      <td>ADAMS FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00416388, C00467860, C00522797, C00580282, C...</td>
     </tr>
     <tr>
       <td>12</td>
-      <td>C00304758</td>
-      <td>S0MO00183</td>
-      <td>BLUNT, ROY</td>
-      <td>[2010, 2012, 2014, 2016, 2018, 2020]</td>
+      <td>ALASKANS FOR VONDERSAAR</td>
+      <td>5</td>
+      <td>[C00346882, C00367599, C00389908, C00415737, C...</td>
     </tr>
     <tr>
       <td>13</td>
-      <td>C00307165</td>
-      <td>H6SD00085</td>
-      <td>THUNE, JOHN R</td>
-      <td>[2000]</td>
+      <td>CLARK FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00358788, C00400275, C00449991, C00452722, C...</td>
     </tr>
     <tr>
       <td>14</td>
-      <td>C00307165</td>
-      <td>S2SD00068</td>
-      <td>THUNE, JOHN</td>
-      <td>[2002]</td>
+      <td>COLE FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00337899, C00373274, C00379735, C00557108, C...</td>
     </tr>
     <tr>
       <td>15</td>
-      <td>C00307165</td>
-      <td>S2SD00068</td>
-      <td>THUNE, JOHN R</td>
-      <td>[2004]</td>
+      <td>COOPER FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00322032, C00376665, C00415810, C00447839, C...</td>
     </tr>
     <tr>
       <td>16</td>
-      <td>C00354597</td>
-      <td>H0NJ10117</td>
-      <td>FLASH, ROCKY</td>
-      <td>[2000]</td>
+      <td>DAVIS FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00377648, C00421909, C00439901, C00449371, C...</td>
     </tr>
     <tr>
       <td>17</td>
-      <td>C00354597</td>
-      <td>H2FL11075</td>
-      <td>FLASH, ROCKY</td>
-      <td>[2002]</td>
+      <td>FLETCHER FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00313999, C00327833, C00344150, C00364406, C...</td>
     </tr>
     <tr>
       <td>18</td>
-      <td>C00354597</td>
-      <td>P40003345</td>
-      <td>FLASH, ROCKY HURRICANE</td>
-      <td>[2004, 2006]</td>
+      <td>GOOD GOVERNMENT FUND</td>
+      <td>5</td>
+      <td>[C00340208, C00358937, C00380261, C00404004, C...</td>
     </tr>
     <tr>
       <td>19</td>
-      <td>C00501197</td>
-      <td>H2TX16185</td>
-      <td>O'ROURKE, ROBERT BETO</td>
-      <td>[2016]</td>
+      <td>MORGAN FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00372730, C00463406, C00505164, C00590976, C...</td>
     </tr>
     <tr>
       <td>20</td>
-      <td>C00501197</td>
-      <td>H2TX16185</td>
-      <td>O'ROURKE, ROBERT ''BETO''</td>
-      <td>[2012]</td>
+      <td>PARKER FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00285569, C00374074, C00449140, C00474254, C...</td>
     </tr>
     <tr>
       <td>21</td>
-      <td>C00501197</td>
-      <td>H2TX16185</td>
-      <td>O'ROURKE, ROBERT (BETO)</td>
-      <td>[2014]</td>
+      <td>PETERSON FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00253187, C00287276, C00339754, C00339770, C...</td>
     </tr>
     <tr>
       <td>22</td>
-      <td>C00501197</td>
-      <td>P00010793</td>
-      <td>O'ROURKE, ROBERT BETO</td>
-      <td>[2020]</td>
+      <td>PHIL NORRIS FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00508382, C00547307, C00579268, C00636241, C...</td>
     </tr>
     <tr>
       <td>23</td>
-      <td>C00501197</td>
-      <td>S8TX00285</td>
-      <td>O'ROURKE, ROBERT (BETO)</td>
-      <td>[2018]</td>
+      <td>PORTER FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00284745, C00367367, C00388637, C00516567, C...</td>
     </tr>
     <tr>
       <td>24</td>
-      <td>C00567677</td>
-      <td>H0NY19139</td>
-      <td>HAYWORTH, NAN</td>
-      <td>[2014]</td>
+      <td>POWELL FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00299529, C00387985, C00396697, C00471961, C...</td>
     </tr>
     <tr>
       <td>25</td>
-      <td>C00567677</td>
-      <td>H2AZ08102</td>
-      <td>MCSALLY, MARTHA</td>
-      <td>[2018]</td>
+      <td>ROBERTS FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00312884, C00423392, C00435339, C00507202, C...</td>
     </tr>
     <tr>
       <td>26</td>
-      <td>C00567677</td>
-      <td>H2AZ08102</td>
-      <td>MCSALLY, MARTHA E. MS.</td>
-      <td>[2016]</td>
+      <td>RUSSELL FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00327866, C00428292, C00444547, C00459560, C...</td>
     </tr>
     <tr>
       <td>27</td>
-      <td>C00567677</td>
-      <td>H4CA45097</td>
-      <td>WALTERS, MIMI</td>
-      <td>[2020]</td>
+      <td>SMITH FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00313866, C00314021, C00356055, C00429803, C...</td>
+    </tr>
+    <tr>
+      <td>28</td>
+      <td>STEPP COMMITTEE</td>
+      <td>5</td>
+      <td>[C00419481, C00444398, C00475160, C00514448, C...</td>
+    </tr>
+    <tr>
+      <td>29</td>
+      <td>SULLIVAN FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00311464, C00335034, C00452441, C00652388, C...</td>
+    </tr>
+    <tr>
+      <td>30</td>
+      <td>WEGNER FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00421628, C00450031, C00470294, C00517003, C...</td>
+    </tr>
+    <tr>
+      <td>31</td>
+      <td>WILLIAMS FOR CONGRESS</td>
+      <td>5</td>
+      <td>[C00321331, C00574541, C00590091, C00640110, C...</td>
+    </tr>
+    <tr>
+      <td>32</td>
+      <td>AMERICANS FOR AMERICA</td>
+      <td>4</td>
+      <td>[C00490540, C00518340, C00565234, C00587790]</td>
+    </tr>
+    <tr>
+      <td>33</td>
+      <td>BROWN FOR CONGRESS</td>
+      <td>4</td>
+      <td>[C00375014, C00416164, C00443069, C00485391]</td>
+    </tr>
+    <tr>
+      <td>34</td>
+      <td>CLEAN WATER ACTION PROJECT</td>
+      <td>4</td>
+      <td>[C70001839, C70001862, C70001870, C70002324]</td>
+    </tr>
+    <tr>
+      <td>35</td>
+      <td>COMMITTEE TO ELECT WAYNE E HARMON</td>
+      <td>4</td>
+      <td>[C00438499, C00466805, C00546721, C00716514]</td>
+    </tr>
+    <tr>
+      <td>36</td>
+      <td>CRAMER FOR CONGRESS</td>
+      <td>4</td>
+      <td>[C00337287, C00474569, C00504704, C00555961]</td>
+    </tr>
+    <tr>
+      <td>37</td>
+      <td>CRAWFORD FOR CONGRESS</td>
+      <td>4</td>
+      <td>[C00328435, C00462374, C00550749, C00648600]</td>
+    </tr>
+    <tr>
+      <td>38</td>
+      <td>FRIENDS OF DUANE SAND</td>
+      <td>4</td>
+      <td>[C00352914, C00392712, C00395608, C00460246]</td>
+    </tr>
+    <tr>
+      <td>39</td>
+      <td>GUILD FOR CONGRESS</td>
+      <td>4</td>
+      <td>[C00480459, C00506121, C00546242, C00600890]</td>
+    </tr>
+    <tr>
+      <td>40</td>
+      <td>HELLER VICTORY COMMITTEE</td>
+      <td>4</td>
+      <td>[C00498782, C00543108, C00607812, C00630889]</td>
+    </tr>
+    <tr>
+      <td>41</td>
+      <td>HUGHES FOR CONGRESS</td>
+      <td>4</td>
+      <td>[C00290163, C00419846, C00551309, C00610071]</td>
+    </tr>
+    <tr>
+      <td>42</td>
+      <td>ISAKSON VICTORY COMMITTEE</td>
+      <td>4</td>
+      <td>[C00404723, C00490284, C00577635, C00639328]</td>
+    </tr>
+    <tr>
+      <td>43</td>
+      <td>MARK GIBSON FOR CONGRESS</td>
+      <td>4</td>
+      <td>[C00524645, C00557538, C00558783, C00597005]</td>
+    </tr>
+    <tr>
+      <td>44</td>
+      <td>MILLER FOR CONGRESS</td>
+      <td>4</td>
+      <td>[C00344614, C00397018, C00496356, C00633453]</td>
+    </tr>
+    <tr>
+      <td>45</td>
+      <td>MONTOYA FOR CONGRESS</td>
+      <td>4</td>
+      <td>[C00480327, C00505172, C00554139, C00715920]</td>
+    </tr>
+    <tr>
+      <td>46</td>
+      <td>MURRAY FOR CONGRESS</td>
+      <td>4</td>
+      <td>[C00269589, C00300780, C00364026, C00396317]</td>
+    </tr>
+    <tr>
+      <td>47</td>
+      <td>PHELPS FOR CONGRESS</td>
+      <td>4</td>
+      <td>[C00327205, C00327932, C00352484, C00385542]</td>
+    </tr>
+    <tr>
+      <td>48</td>
+      <td>PHILLIPS FOR CONGRESS</td>
+      <td>4</td>
+      <td>[C00339044, C00387118, C00441212, C00600833]</td>
+    </tr>
+    <tr>
+      <td>49</td>
+      <td>PRICE FOR CONGRESS</td>
+      <td>4</td>
+      <td>[C00195628, C00330928, C00386755, C00408856]</td>
     </tr>
   </tbody>
 </table>
@@ -19198,7 +18329,27 @@ select cmte.cmte_id,
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Summary">Summary<a class="anchor-link" href="#Summary">&#182;</a></h2><p>Based on the above exploration, the following enhancements to the schema are recommended:</p>
+<h2 id="Summary">Summary<a class="anchor-link" href="#Summary">&#182;</a></h2><h3 id="Findings">Findings<a class="anchor-link" href="#Findings">&#182;</a></h3><ul>
+<li>Less than 1% of records have obvious flaws in the name, but there are opportunites to normalize (to make name matching more accurate, when needed)</li>
+<li>There are no null <code>cmte_id</code>'s and no duplicated <code>cmte_id</code>'s within an election cycle</li>
+<li>High-level summary of <code>cmte_id</code> longevity across two-year election cycles:<ul>
+<li>28% of distinct <code>cmte_id</code>'s only appear in a single election cycle's data (i.e. 2 years)</li>
+<li>47% of distinct <code>cmte_id</code>'s appear in two or three election cycles' data (i.e. 3-6 years)</li>
+<li>25% of distinct <code>cmte_id</code>'s appear in four or more election cycles' data (i.e. 7+ years)</li>
+</ul>
+</li>
+<li>10% of Committees (identified by <code>cmte_id</code>) are listed under different names (<code>cmte_nm</code>) across election cycles<ul>
+<li>This represents 14% of Committees appearing in multiple election cycles</li>
+<li>In some cases, it is a matter of spacing and punctuation (fixable by standard normalization), but in many other cases, the names have different wording (e.g. more or less specificity) or spelling (e.g. abbreviations)</li>
+</ul>
+</li>
+<li>2.8% of distinct Committee names in the overall data set map to 2 or more <code>cmte_id</code>'s within an election cycle<ul>
+<li>A similar number (actually 2.7%) of distinct Committee names are seen with different <code>cmte_id</code>'s <em>across</em> election cycles</li>
+<li>Many of the same names appear in both lists of replicated/reused names</li>
+</ul>
+</li>
+</ul>
+<h3 id="Recommendations">Recommendations<a class="anchor-link" href="#Recommendations">&#182;</a></h3><p>Based on the above exploration and findings, the following enhancements to the schema are recommended:</p>
 <ul>
 <li>Normalize <code>cmte_nm</code> (and other text fields? [see below]) during intial load (awk script)<ul>
 <li>Convert to uppercase</li>
@@ -19206,11 +18357,10 @@ select cmte.cmte_id,
 <li>Eliminate whitespace immediately inside of parentheses</li>
 </ul>
 </li>
-<li>Create <code>cmte_master</code> table based on unique <code>cmte_id</code>'s (across election cycles)<ul>
-<li>Include <code>base_cmte_master_id</code> for associating Committees with different <code>cmte_id</code>'s, but identical (<em>or similar?</em>) names</li>
+<li>Create <code>cmte_mstr</code> table based on unique <code>cmte_id</code>'s (across election cycles)<ul>
+<li>Include <code>base_cmte_mstr_id</code> for associating Committees with different <code>cmte_id</code>'s, but identical (<em>or similar</em>) names, or otherwise deemed to be the same underlying organization</li>
 </ul>
 </li>
-<li>Create "Base Candidate" associations based on variation of Candidate IDs/name for Commmittees (identified by <code>cmte_id</code>)</li>
 </ul>
 <p>Other text fields to consider for normalization:</p>
 <ul>

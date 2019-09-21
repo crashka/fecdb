@@ -1,9 +1,3 @@
-*~
-*.out
-*.log
 data/*.zip
 dumps/
 analysis/
-discard/
-venv/
-.ipynb_checkpoints/
