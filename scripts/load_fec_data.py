@@ -28,9 +28,9 @@ CYCLE_COL    = 'elect_cycle'
 # data set record -- ds_name: (table, do_gawk, do_sed, do_uniq, data_file)
 # NOTE: if do_gawk is True, then "fmt_<ds_name>.awk" must exist in SCRIPTS_DIR
 DATA_SETS  = {
-    'cn'     : ('cand',          False, True, True,  None),
+    'cn'     : ('cand',          True,  True, True,  None),
     'weball' : ('cand_fins',     True,  True, False, None),
-    'cm'     : ('cmte',          False, True, True,  None),
+    'cm'     : ('cmte',          True,  True, True,  None),
     'webk'   : ('cmte_fins',     True,  True, False, None),
     'pas2'   : ('cmte_contrib',  True,  True, False, None),
     'oth'    : ('cmte_misc',     True,  True, False, None),
